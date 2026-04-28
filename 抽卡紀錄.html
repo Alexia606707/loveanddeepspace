@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>戀與深空 抽卡紀錄總覽</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        :root {
+            --bg-dark: #0c0e1a;
+            --bg-card: rgba(255,255,255,0.035);
+            --border: rgba(255,255,255,0.07);
+            --accent: #a78bfa;
+            --blue: #60a5fa;
+            --green: #6ee7b7;
+            --red: #fca5a5;
+            --yellow: #fbbf24;
+            --orange: #fb923c;
+            --pink: #f9a8d4;
+            --text: #e0e0e0;
+            --text-dim: #7c8aaa;
+        }
+        body {
+            font-family: 'Microsoft JhengHei','Segoe UI',system-ui,sans-serif;
+            background: linear-gradient(135deg, #0c0e1a 0%, #1a1040 40%, #0d1f3c 100%);
+            min-height: 100vh; padding: 30px 16px; color: var(--text);
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        /* ===== 標題 ===== */
+        .hero {
+            text-align:center; margin-bottom:40px; padding:32px 24px 26px;
+            background: linear-gradient(135deg, rgba(167,139,250,.08) 0%, rgba(96,165,250,.06) 50%, rgba(249,168,212,.08) 100%);
+            border:1px solid rgba(167,139,250,.2);
+            border-radius:18px;
+            position:relative;
+            overflow:hidden;
+        }
+        .hero::before {
+            content:''; position:absolute; top:0; left:0; right:0; height:3px;
+            background: linear-gradient(90deg, #a78bfa, #60a5fa, #f9a8d4, #a78bfa);
+            background-size:300% auto;
+            animation: shimmer 4s linear infinite;
+        }
+        .hero::after {
+            content:''; position:absolute; bottom:0; left:0; right:0; height:3px;
+            background: linear-gradient(90deg, #f9a8d4, #60a5fa, #a78bfa, #f9a8d4);
+            background-size:300% auto;
+            animation: shimmer 4s linear infinite;
+        }
+        .hero h1 {
+            font-size:2.6em; letter-spacing:6px; margin-bottom:4px;
+            background: linear-gradient(90deg,#a78bfa,#60a5fa,#f9a8d4,#a78bfa);
+            background-size:300% auto;
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+            animation: shimmer 4s linear infinite;
+            text-shadow: 0 0 40px rgba(167,139,250,.3);
+            filter: drop-shadow(0 0 12px rgba(167,139,250,.15));
+        }
+        .hero .sub { color:var(--text-dim); margin-top:8px; font-size:.9em; letter-spacing:3px; }
+        @keyframes shimmer { 0%{background-position:0% center} 100%{background-position:300% center} }
+
+        /* ===== 總覽卡片 ===== */
+        .stats-grid {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr));
+            gap:14px; margin-bottom:30px;
+        }
+        .stat-box {
+            background:var(--bg-card); border:1px solid var(--border);
+            border-radius:14px; padding:18px 14px; text-align:center;
+            transition: transform .2s;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            overflow:visible;
+        }
+        .stat-box:hover { transform:translateY(-2px); }
+        .stat-box .label { font-size:.75em; color:var(--text-dim); margin-bottom:6px; letter-spacing:1px; }
+        .stat-box .val { font-size:1.5em; font-weight:800; }
+        .stat-box .note { font-size:.7em; color:var(--text-dim); margin-top:4px; white-space:nowrap; }
+        .dia-gift-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+
+        /* ===== 區塊共用 ===== */
+        .section { margin-bottom:40px; }
+        .section-title {
+            font-size:1.25em; font-weight:700; color:var(--accent);
+            margin-bottom:18px; margin-top:12px; padding:10px 16px;
+            border-left:4px solid var(--accent);
+            background:rgba(167,139,250,.06);
+            border-radius:0 8px 8px 0;
+            cursor:pointer; user-select:none;
+            letter-spacing:2px;
+            display:flex; align-items:center;
+        }
+        .section-title .arrow { margin-left:auto; }
+
+        /* ===== 圖表 ===== */
+        .chart-wrap {
+            background:var(--bg-card); border:1px solid var(--border);
+            border-radius:14px; padding:20px; margin-bottom:18px;
+            position:relative; width:100%; min-width:0; overflow:hidden;
+        }
+
+        /* ===== 角色分析 ===== */
+        .char-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+        .char-card {
+            background:var(--bg-card); border:1px solid var(--border);
+            border-radius:14px; padding:18px; text-align:center;
+        }
+        .char-card .icon { font-size:1.6em; margin-bottom:6px; }
+        .char-card .name { font-size:1em; font-weight:700; margin-bottom:10px; }
+        .char-card .row { display:flex; justify-content:space-between; font-size:.82em; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.03); }
+        .char-card .row:last-child { border:none; }
+        .char-card .row .k { color:var(--text-dim); }
+
+        /* ===== 卡池明細 ===== */
+        .banner-card {
+            background:var(--bg-card); border:1px solid var(--border);
+            border-radius:14px; padding:22px 24px; margin-bottom:16px;
+            transition: transform .15s;
+        }
+        .banner-card:hover { transform:translateY(-1px); }
+        .banner-hd { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+        .banner-name { font-size:1.08em; font-weight:700; color:#c4b5fd; }
+        .banner-date { font-size:.8em; color:var(--text-dim); background:rgba(100,140,255,.08); padding:3px 12px; border-radius:16px; }
+        .banner-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+        .tag { font-size:.76em; padding:3px 10px; border-radius:5px; background:rgba(167,139,250,.1); border:1px solid rgba(167,139,250,.15); color:#d4c4ff; }
+        .tag.partner { background:rgba(250,180,100,.1); border-color:rgba(250,180,100,.2); color:#fcd9a0; }
+        .tag.skip { background:rgba(250,100,100,.1); border-color:rgba(250,100,100,.2); color:#fca5a5; }
+
+        table.pull-tbl { width:100%; border-collapse:separate; border-spacing:0; border-radius:10px; overflow:hidden; border:1px solid var(--border); margin-bottom:10px; }
+        .pull-tbl th { background:rgba(100,120,255,.08); padding:9px 10px; font-size:.78em; color:#a5b4fc; letter-spacing:.5px; text-align:center; border-bottom:1px solid var(--border); }
+        .pull-tbl td { padding:8px 10px; font-size:.84em; text-align:center; border-bottom:1px solid rgba(255,255,255,.02); }
+        .pull-tbl tr:last-child td { border:none; }
+        .pull-tbl tr:hover td { background:rgba(167,139,250,.04); }
+        .pull-tbl .left { text-align:left; }
+        .c-blue { color:var(--blue); font-weight:600; }
+        .c-green { color:var(--green); font-weight:700; }
+        .c-red { color:var(--red); font-weight:700; }
+        .c-yellow { color:var(--yellow); font-weight:700; }
+        .c-dim { color:var(--text-dim); }
+
+        .gift-bar {
+            display:flex; justify-content:space-between; align-items:center;
+            background:rgba(250,200,100,.04); border:1px solid rgba(250,200,100,.08);
+            border-radius:8px; padding:8px 16px; font-size:.82em;
+        }
+        .gift-bar .lbl { color:#c9a96e; }
+        .gift-bar .amt { color:var(--yellow); font-weight:700; }
+
+        .banner-summary {
+            display:flex; gap:14px; flex-wrap:wrap; margin-top:10px;
+        }
+        .banner-summary .chip {
+            font-size:.78em; padding:4px 12px; border-radius:8px;
+            background:rgba(100,140,255,.06); border:1px solid rgba(100,140,255,.1);
+        }
+
+        /* ===== 成本排行 ===== */
+        .rank-tbl { width:100%; border-collapse:separate; border-spacing:0; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        .rank-tbl th { background:rgba(100,120,255,.08); padding:10px 12px; font-size:.8em; color:#a5b4fc; text-align:center; border-bottom:1px solid var(--border); }
+        .rank-tbl td { padding:9px 12px; font-size:.85em; text-align:center; border-bottom:1px solid rgba(255,255,255,.02); }
+        .rank-tbl tr:hover td { background:rgba(167,139,250,.04); }
+        .rank-tbl .left { text-align:left; }
+        .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.75em; font-weight:600; }
+        .badge-lucky { background:rgba(110,231,183,.12); color:#6ee7b7; }
+        .badge-unlucky { background:rgba(252,165,165,.12); color:#fca5a5; }
+
+        /* ===== 篩選 ===== */
+        .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+        .filter-btn {
+            font-size:.8em; padding:5px 14px; border-radius:20px; cursor:pointer;
+            background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--text-dim);
+            transition: all .2s;
+        }
+        .filter-btn:hover, .filter-btn.active { background:rgba(167,139,250,.15); border-color:var(--accent); color:var(--accent); }
+
+        /* ===== RWD ===== */
+        @media(max-width:700px){
+            .hero h1 { font-size:1.6em; }
+            .hero { padding:24px 16px 20px; }
+            .stats-grid { grid-template-columns:repeat(2,1fr); }
+            .dia-gift-outer { grid-template-columns:1fr !important; }
+            .dia-gift-grid { grid-template-columns:repeat(2,1fr); }
+            .banner-card { padding:14px 12px; }
+            .pull-tbl th,.pull-tbl td { padding:6px 5px; font-size:.72em; }
+        }
+        @media(max-width:450px){
+            .stats-grid { grid-template-columns:repeat(2,1fr); gap:8px; }
+            .dia-gift-grid { grid-template-columns:1fr; }
+            .stat-box .val { font-size:1.2em; }
+            .stat-box .note { white-space:normal; }
+        }
+
+        /* 回到頂端 */
+        .back-top {
+            position:fixed; bottom:24px; right:24px; width:42px; height:42px;
+            border-radius:50%; background:rgba(167,139,250,.25); border:1px solid var(--accent);
+            color:var(--accent); font-size:1.2em; cursor:pointer; display:none;
+            align-items:center; justify-content:center; z-index:99; backdrop-filter:blur(6px);
+        }
+        .back-top.show { display:flex; }
+
+        /* 開關 */
+        .toggle-wrap { display:inline-flex; align-items:center; gap:8px; margin-left:14px; font-size:.78em; color:var(--text-dim); vertical-align:middle; }
+        .toggle-switch {
+            position:relative; width:36px; height:20px; background:rgba(255,255,255,.1);
+            border-radius:10px; cursor:pointer; transition: background .2s; border:1px solid rgba(255,255,255,.1);
+        }
+        .toggle-switch.on { background:rgba(167,139,250,.4); border-color:var(--accent); }
+        .toggle-switch::after {
+            content:''; position:absolute; top:2px; left:2px; width:14px; height:14px;
+            background:#fff; border-radius:50%; transition: transform .2s;
+        }
+        .toggle-switch.on::after { transform:translateX(16px); }
+    </style>
+</head>
+<body>
+<div class="container" id="app"></div>
+<button class="back-top" id="btnTop">↑</button>
+
+<script>
+// ============================
+// 資料定義
+// ============================
+// 新增卡池模板：複製下面這段到 banners 陣列最後面，填好存檔即可
+// {
+//     date:'日期範圍',          // 例：'2026/5/1-5/10'
+//     name:'卡池名稱',          // 【】裡的名字
+//     tag:'備註',               // 自己的備註
+//     type:'分類',              // 全員 / 日卡首次 / 日卡復刻 / 生日卡 / 限定 / 復刻
+//     partner: null,            // 搭檔身分，沒有填 null，有填 '角色·搭檔名'
+//     cards:['角色·卡面1'],     // 卡面清單，照你想要的順序
+//     pulls:[                   // 每次出卡紀錄（按順序填）
+//       // n: 卡名
+//       // icon: ⭐️沈星回 / 🍐黎深 / 🐟祁煜 / 🐦‍⬛秦徹 / 🍎夏以晝
+//       // at: 累計抽數
+//       // dia: 花費鑽石（0 就填 0）
+//       // 額外標記（有才加，沒有不用寫）：
+//       //   std:true    → 常駐卡
+//       //   dbl:true    → 雙蛋黃
+//       //   box:true    → 開盒子
+//       //   extra:true  → 加抽（拿衣服、拍照動作等）
+//       {n:'角色·卡面1',icon:'🍎',at:60,dia:0},
+//       {n:'常駐烏鴉',icon:'🐦‍⬛',at:90,dia:900,std:true},
+//     ],
+//     giftFormula:'禮包算式',   // 例：'15×3+30×3+150×3'
+//     gift:0                    // 禮包金額
+// },
+const banners = [
+  {
+    date:'2025/7/3-7/22', name:'於深空見證的', tag:'婚卡', type:'全員',
+    partner: null,
+    cards:['沈星回·星泊地','黎深·渡雪境','祁煜·朝汐嶼','秦徹·明暗界','夏以晝·永無島'],
+    pulls:[
+      {n:'秦徹·明暗界',icon:'🐦‍⬛',at:60,dia:900},
+      {n:'夏以晝·永無島',icon:'🍎',at:120,dia:2850},
+      {n:'常駐小魚',icon:'🐟',at:160,dia:0,std:true},
+      {n:'祁煜·朝汐嶼',icon:'🐟',at:230,dia:4950},
+      {n:'夏以晝·永無島②',icon:'🍎',at:290,dia:1200},
+      {n:'黎深·渡雪境',icon:'🍐',at:350,dia:9000},
+      {n:'沈星回·星泊地',icon:'⭐️',at:350,dia:0,box:true},
+    ],
+    giftFormula:'15×5+30×3+150×5+320×5+390×5', gift:4465
+  },
+  {
+    date:'2025/7/25-8/8', name:'沉墜的冠冕', tag:'沈星回國王日卡', type:'日卡首次',
+    partner:'沈星回·暗蝕國王',
+    cards:['沈星回·夜誓迷月','沈星回·夜誓燼歌'],
+    pulls:[
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:40,dia:0,std:true},
+      {n:'沈星回·夜誓迷月',icon:'⭐️',at:70,dia:0},
+      {n:'常駐星星',icon:'⭐️',at:120,dia:0,std:true},
+      {n:'沈星回·夜誓燼歌',icon:'⭐️',at:150,dia:1800,box:true},
+    ],
+    giftFormula:'15×5+30×5+150×5+320×5', gift:2575
+  },
+  {
+    date:'2025/8/12-8/31', name:'盛夏與你與海風', tag:'夏日卡', type:'全員',
+    cards:['沈星回·沁涼瞬擊','黎深·私奔潮線','祁煜·失重熱浪','秦徹·戀速引擎','夏以晝·澄風掠海'],
+    pulls:[
+      {n:'夏以晝·澄風掠海',icon:'🍎',at:30,dia:0},
+      {n:'沈星回·沁涼瞬擊',icon:'⭐️',at:60,dia:0},
+      {n:'祁煜·失重熱浪',icon:'🐟',at:120,dia:0},
+      {n:'常駐小梨',icon:'🍐',at:140,dia:0,std:true},
+      {n:'黎深·私奔潮線',icon:'🍐',at:210,dia:0},
+      {n:'黎深·私奔潮線②',icon:'🍐',at:270,dia:8100},
+      {n:'秦徹·戀速引擎',icon:'🐦‍⬛',at:280,dia:1500,box:true},
+    ],
+    giftFormula:'15×5+30×3+150×5+320×5+390×5', gift:4465
+  },
+  {
+    date:'2025/8/31-9/7', name:'以我寄黎明', tag:'黎深生日卡', type:'生日卡',
+    cards:['黎深·以我寄黎明'],
+    pulls:[
+      {n:'黎深·以我寄黎明',icon:'🍐',at:50,dia:300},
+    ],
+    giftFormula:'15×3+30×3+150×3', gift:585
+  },
+  {
+    date:'2025/9/9-9/18', name:'熱意揣度', tag:'秦徹', type:'限定',
+    cards:['秦徹·熱意揣度'],
+    pulls:[
+      {n:'常駐小梨',icon:'🍐',at:50,dia:0,std:true},
+      {n:'秦徹·熱意揣度',icon:'🐦‍⬛',at:120,dia:4050},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×2+390×2', gift:1945
+  },
+  {
+    date:'2025/9/19-9/27', name:'無人知曉時', tag:'情人節復刻', type:'復刻',
+    cards:['沈星回·馥情一隅','黎深·沉夜共醉','祁煜·酌意邀禮'], pulls:[], gift:0, skip:true, giftFormula:''
+  },
+  {
+    date:'2025/9/25-10/9', name:'時與世的邊緣', tag:'黎深神明日卡', type:'日卡首次',
+    partner:'黎深·終末之神',
+    cards:['黎深·神諭聖詠','黎深·神諭歸寂'],
+    pulls:[
+      {n:'常駐小梨',icon:'🍐',at:60,dia:0,std:true},
+      {n:'黎深·神諭聖詠',icon:'🍐',at:90,dia:0},
+      {n:'黎深·神諭歸寂',icon:'🍐',at:160,dia:2700},
+    ],
+    giftFormula:'15×5+30×5+150×5+320×5+390×2', gift:3355
+  },
+  {
+    date:'2025/10/11-10/18', name:'來自星軌間', tag:'沈星回生日卡', type:'生日卡',
+    cards:['沈星回·來自星軌間'],
+    pulls:[
+      {n:'沈星回·來自星軌間',icon:'⭐️',at:30,dia:0},
+      {n:'常駐小梨',icon:'🍐',at:40,dia:0,std:true,dbl:true},
+      {n:'沈星回·來自星軌間②',icon:'⭐️',at:40,dia:0,dbl:true},
+      {n:'拍照動作(加抽)',icon:'📸',at:50,dia:300,extra:true},
+    ],
+    giftFormula:'15×3+30×3+150×3', gift:585
+  },
+  {
+    date:'2025/10/20-10/27', name:'龍影隕落處', tag:'龍徹日卡復刻', type:'日卡復刻',
+    partner:'秦徹·深淵主宰',
+    cards:['秦徹·深淵秘印','秦徹·深淵霞暈'],
+    pulls:[
+      {n:'秦徹·深淵秘印',icon:'🐦‍⬛',at:60,dia:0},
+    ],
+    giftFormula:'30×1+150×3+320×3', gift:1440
+  },
+  {
+    date:'2025/10/29-11/18', name:'直到心跳沸騰', tag:'偶像熱舞卡', type:'全員',
+    cards:['沈星回·錯拍溯行','黎深·冷調交熔','祁煜·聲浪復燃','秦徹·即興放逐','夏以晝·灼頻超載'],
+    pulls:[
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:20,dia:0,std:true},
+      {n:'夏以晝·灼頻超載',icon:'🍎',at:90,dia:0},
+      {n:'沈星回·錯拍溯行',icon:'⭐️',at:150,dia:3750},
+      {n:'黎深·冷調交熔',icon:'🍐',at:190,dia:1650},
+      {n:'秦徹·即興放逐',icon:'🐦‍⬛',at:250,dia:3600},
+      {n:'祁煜·聲浪復燃',icon:'🐟',at:290,dia:3750,box:true},
+    ],
+    giftFormula:'15×5+30×3+150×5+320×5+390×5', gift:4465
+  },
+  {
+    date:'2025/11/21-11/30', name:'甜野極馳', tag:'祁煜', type:'限定',
+    cards:['祁煜·甜野極馳'],
+    pulls:[
+      {n:'常駐哥哥',icon:'🍎',at:30,dia:0,std:true},
+      {n:'祁煜·甜野極馳',icon:'🐟',at:90,dia:3750},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×2', gift:1165
+  },
+  {
+    date:'2025/12/2-12/16', name:'銀翼安魂地', tag:'惡魔徹日卡', type:'日卡首次',
+    partner:'秦徹·銀翼惡魔',
+    cards:['秦徹·猩紅席捲','秦徹·猩紅彌散'],
+    pulls:[
+      {n:'秦徹·猩紅彌散',icon:'🐦‍⬛',at:60,dia:0,dbl:true},
+      {n:'秦徹·猩紅席捲',icon:'🐦‍⬛',at:60,dia:0,dbl:true},
+      {n:'秦徹·猩紅彌散②',icon:'🐦‍⬛',at:120,dia:0},
+      {n:'秦徹·猩紅席捲②',icon:'🐦‍⬛',at:150,dia:0,box:true},
+    ],
+    giftFormula:'15×5+30×5+150×5+320×5+390×1', gift:2965
+  },
+  {
+    date:'2025/12/18-12/27', name:'慵懶共謀', tag:'哥哥半裸圍裙', type:'限定',
+    cards:['夏以晝·慵懶共謀'],
+    pulls:[
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:30,dia:0,std:true},
+      {n:'夏以晝·慵懶共謀',icon:'🍎',at:100,dia:1500},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×2+390×1', gift:1555
+  },
+  {
+    date:'2025/12/31-2026/1/21', name:'愛，宇宙，詩王座', tag:'二週年女王卡', type:'全員',
+    cards:['沈星回·洄光頌','黎深·辰寰律','祁煜·宴神曲','秦徹·混沌紀','夏以晝·浴冕歌'],
+    pulls:[
+      {n:'常駐星星',icon:'⭐️',at:60,dia:0,std:true},
+      {n:'夏以晝·浴冕歌',icon:'🍎',at:70,dia:0},
+      {n:'常駐小魚',icon:'🐟',at:130,dia:0,std:true},
+      {n:'祁煜·宴神曲',icon:'🐟',at:200,dia:0},
+      {n:'常駐哥哥',icon:'🍎',at:260,dia:7050},
+      {n:'黎深·辰寰律',icon:'🍐',at:300,dia:6000,dbl:true},
+      {n:'沈星回·洄光頌',icon:'⭐️',at:300,dia:0,dbl:true},
+      {n:'秦徹·混沌紀',icon:'🐦‍⬛',at:300,dia:0,box:true},
+    ],
+    giftFormula:'15×5+30×3+150×5+320×5+390×5', gift:4465
+  },
+  {
+    date:'2026/1/23-2/1', name:'竊竊私吻', tag:'黎深', type:'限定',
+    cards:['黎深·竊竊私吻'],
+    pulls:[
+      {n:'黎深·竊竊私吻',icon:'🍐',at:60,dia:150},
+      {n:'拿衣服(加抽)',icon:'👔',at:70,dia:1200,extra:true},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×2', gift:1165
+  },
+  {
+    date:'2026/2/2-2/9', name:'當宇宙陷落時', tag:'哥哥X-02日卡復刻', type:'日卡復刻',
+    partner:'夏以晝·終極兵器X-02',
+    cards:['夏以晝·寂路不歸','夏以晝·寂路同赴'],
+    pulls:[
+      {n:'常駐小梨',icon:'🍐',at:40,dia:0,std:true},
+      {n:'夏以晝·寂路同赴',icon:'🍎',at:60,dia:4350},
+    ],
+    giftFormula:'30×1+150×3+320×5', gift:2080
+  },
+  {
+    date:'2026/2/10-2/27', name:'人間繾綣意', tag:'全員古風長髮卡', type:'全員',
+    cards:['沈星回·問劍觀花','黎深·飛鳶墜春','祁煜·錦夜琢心','秦徹·千燈共我','夏以晝·晴晝當歸'],
+    pulls:[
+      {n:'夏以晝·晴晝當歸',icon:'🍎',at:60,dia:0},
+      {n:'常駐哥哥',icon:'🍎',at:120,dia:0,std:true},
+      {n:'黎深·飛鳶墜春',icon:'🍐',at:180,dia:0},
+      {n:'祁煜·錦夜琢心',icon:'🐟',at:190,dia:0},
+      {n:'秦徹·千燈共我',icon:'🐦‍⬛',at:220,dia:0},
+      {n:'沈星回·問劍觀花',icon:'⭐️',at:250,dia:4500},
+      {n:'秦徹·千燈共我②',icon:'🐦‍⬛',at:260,dia:750},
+      {n:'夏以晝·晴晝當歸②',icon:'🍎',at:330,dia:10500},
+      {n:'祁煜·錦夜琢心②',icon:'🐟',at:330,dia:0,box:true},
+    ],
+    giftFormula:'15×5+30×3+150×5+320×5+390×5', gift:4465
+  },
+  {
+    date:'2026/3/1-3/8', name:'步步向晚晴', tag:'祁煜生日卡', type:'生日卡',
+    cards:['祁煜·步步向晚晴'],
+    pulls:[
+      {n:'祁煜·步步向晚晴',icon:'🐟',at:60,dia:300},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×1', gift:875
+  },
+  {
+    date:'2026/3/9-3/18', name:'煙火來處', tag:'星星炒菜卡', type:'限定',
+    cards:['沈星回·煙火來處'],
+    pulls:[
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:60,dia:150,std:true},
+      {n:'沈星回·煙火來處',icon:'⭐️',at:70,dia:0},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×2+390×1', gift:1555
+  },
+  {
+    date:'2026/3/19-3/27', name:'眸光映照處', tag:'限時復刻', type:'復刻',
+    cards:['沈星回·午後繾綣','黎深·此心無間','祁煜·唇畔絮語'],
+    pulls:[
+      {n:'沈星回·午後繾綣',icon:'⭐️',at:50,dia:0},
+      {n:'祁煜·唇畔絮語',icon:'🐟',at:60,dia:750},
+    ],
+    giftFormula:'30×1+150×1+320×1+390×3', gift:1670
+  },
+  {
+    date:'2026/3/28-4/11', name:'萬鬼行絕', tag:'冥主哥哥日卡', type:'日卡首次',
+    partner:'夏以晝·冥羅之主',
+    cards:['夏以晝·沉冥幽眷','夏以晝·沉冥相遙'],
+    pulls:[
+      {n:'夏以晝·沉冥相遙',icon:'🍎',at:70,dia:0,dbl:true},
+      {n:'夏以晝·沉冥幽眷',icon:'🍎',at:70,dia:0,dbl:true},
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:140,dia:3750,std:true},
+      {n:'夏以晝·沉冥相遙②',icon:'🍎',at:200,dia:2100},
+      {n:'夏以晝·沉冥幽眷②',icon:'🍎',at:200,dia:1500,box:true},
+    ],
+    giftFormula:'15×5+30×5+150×5+320×5+390×3', gift:3745
+  },
+  {
+    date:'2026/4/6-4/13', name:'燎然升溫', tag:'星星限時復刻', type:'復刻',
+    cards:['沈星回·溫軟怦然'],
+    pulls:[
+      {n:'常駐哥哥',icon:'🍎',at:60,dia:600,std:true},
+    ],
+    giftFormula:'30×1+150×1+290×1+390×3', gift:1640
+  },
+  {
+    date:'2026/4/13-4/20', name:'肆雨照夜', tag:'秦徹生日卡', type:'生日卡',
+    cards:['秦徹·肆雨照夜'],
+    pulls:[
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:20,dia:0,std:true},
+      {n:'秦徹·肆雨照夜',icon:'🐦‍⬛',at:80,dia:1800},
+    ],
+    giftFormula:'15×3+30×3+150×3+290×2', gift:1165
+  },
+  {
+    date:'2026/4/21-4/28', name:'當海淹沒於海', tag:'海神日卡復刻', type:'日卡復刻',
+    partner:'祁煜·利莫里亞海神',
+    cards:['祁煜·霧海離歌','祁煜·霧海神臨'],
+    pulls:[
+      {n:'祁煜·霧海神臨',icon:'🐟',at:60,dia:0},
+      {n:'常駐烏鴉',icon:'🐦‍⬛',at:90,dia:900,std:true},
+      {n:'祁煜·霧海離歌',icon:'🐟',at:160,dia:5100},
+    ],
+    giftFormula:'30×1+150×3+320×5+390×3', gift:3250
+  },
+];
+
+// ============================
+// 計算引擎
+// ============================
+// 【分類規則】
+//   目標卡 = 不是 std 也不是 extra 的卡（你真正要抽的卡）
+//   常駐卡 = std:true 的卡（抽卡過程中順便出的常駐池角色）
+//   加抽   = extra:true 的卡（拿衣服、拍照動作等額外花費）
+//   → 加抽的「抽數」和「鑽石」都歸入目標計算
+//   → 常駐 = 總 - 目標（用減法確保相加一致）
+//
+// 【幾抽出（delta）計算規則】
+//   delta = 這張卡的累計抽數(at) - 上一張卡的累計抽數(prevAt)
+//   雙蛋黃第二張：delta = 0（兩張同一抽出的）
+//   開盒子：delta = 0（不用額外抽數，從盒子選的）
+//
+// 【鑽石歸屬】
+//   每張卡的 dia 就是那批抽數實際花的鑽石
+//   目標鑽石(totalTargetDia) = 目標卡 dia + 加抽 dia
+//   常駐鑽石(totalStdDia) = 總鑽石 - 目標鑽石（用減法確保一致）
+//
+// 【禮包歸屬】
+//   禮包是按整個卡池買的，無法精確拆分到每張卡
+//   → 卡池內按目標卡數均分（每張目標卡分到 gift/bTargetCards）
+//   → 總覽的目標/常駐拆分：按卡片數比例均分
+//     totalTargetGift = totalGift × 目標卡數 ÷ 全部卡數
+//     totalStdGift = totalGift - totalTargetGift
+//
+// 【角色歸類】
+//   用 icon 判斷角色：⭐️沈星回、🍐黎深、🐟祁煜、🐦‍⬛秦徹、🍎夏以晝
+//   目標卡 → charMap[角色].cards / pulls / dia / gift
+//   常駐卡 → charMap[角色].stdCards / stdDia / stdPulls
+//   開關「包含常駐」時會把兩邊加起來
+//
+function compute(){
+    // --- 全域累計 ---
+    let totalPulls=0;        // 總抽數（所有卡池的最大累計抽數加總）
+    let totalDia=0;          // 總鑽石（所有 pull 的 dia 加總）
+    let totalGift=0;         // 總禮包（所有卡池的 gift 加總）
+    let totalCards=0;        // 目標卡總數
+    let totalStd=0;          // 常駐卡總數
+    let totalTargetPulls=0;  // 目標抽數（目標卡+加抽的 delta 加總）
+    let totalBanners=0;      // 卡池期數（排除 skip 的）
+    let totalTargetDia=0;    // 目標鑽石（目標卡+加抽的 dia 加總）
+    let totalStdDia=0;       // 常駐鑽石（常駐卡的 dia 加總，最後會用減法修正）
+    let targetCards=[];      // 每張目標卡的詳細資料（用於歐非排行）
+    let charMap={};          // 角色統計（按 icon 歸類）
+    let bannerStats=[];      // 每期卡池統計
+    let luckyList=[], costlyList=[];
+    let dblYolks=0;          // 雙蛋黃次數
+    let boxes=0;             // 開盒子次數
+
+    // icon → 角色名對照
+    const charNames = {
+        '⭐️':'沈星回','🍐':'黎深','🐟':'祁煜','🐦‍⬛':'秦徹','🍎':'夏以晝'
+    };
+
+    banners.forEach((b,bi)=>{
+        if(b.skip) return; // 忘記抽的卡池跳過
+        totalBanners++;
+        let bPulls = b.pulls.length ? Math.max(...b.pulls.map(p=>p.at)) : 0; // 該期總抽數 = 最後一筆的累計抽數
+        let bDia = b.pulls.reduce((s,p)=>s+p.dia,0); // 該期總鑽石 = 所有 pull 的 dia 加總
+        totalPulls += bPulls;
+        totalDia += bDia;
+        totalGift += b.gift;
+
+        // --- 該期累計 ---
+        let bTargetCards=0, bStdCards=0, bTargetPulls=0, bTargetDia=0, bStdDia=0;
+        let prevAt=0; // 上一張卡的累計抽數，用於計算 delta
+
+        b.pulls.forEach((p,pi)=>{
+            // 雙蛋黃判斷：同一抽數出兩張，第二張 delta=0
+            if(p.dbl && pi>0 && b.pulls[pi-1].at===p.at) {
+                dblYolks++;
+            }
+            if(p.box) boxes++;
+
+            // === 常駐卡 ===
+            if(p.std) {
+                totalStd++;
+                bStdCards++;
+                totalStdDia += p.dia;
+                bStdDia += p.dia;
+                // 常駐也歸類到角色（用 icon 判斷）
+                let stdCharKey = charNames[p.icon] || '其他';
+                if(!charMap[stdCharKey]) charMap[stdCharKey]={icon:p.icon,cards:0,pulls:0,dia:0,gift:0,stdCards:0,stdDia:0,stdPulls:0,list:[]};
+                if(!charMap[stdCharKey].stdCards) { charMap[stdCharKey].stdCards=0; charMap[stdCharKey].stdDia=0; charMap[stdCharKey].stdPulls=0; }
+                charMap[stdCharKey].stdCards++;
+                charMap[stdCharKey].stdDia += p.dia;
+                let sDelta = p.dbl && pi>0 && b.pulls[pi-1].at===p.at ? 0 : p.at - prevAt;
+                charMap[stdCharKey].stdPulls += sDelta;
+            }
+
+            // === 加抽（拿衣服、拍照等）→ 抽數和鑽石歸入目標 ===
+            if(p.extra){
+                totalTargetDia += p.dia;
+                bTargetDia += p.dia;
+                let eDelta = p.dbl && pi>0 && b.pulls[pi-1].at===p.at ? 0 : p.at - prevAt;
+                totalTargetPulls += eDelta;
+            }
+
+            // === 目標卡 ===
+            if(!p.std && !p.extra){
+                totalCards++;
+                bTargetCards++;
+                totalTargetDia += p.dia;
+                bTargetDia += p.dia;
+                // delta = 這張卡花了幾抽（雙蛋黃第二張=0，開盒子=0）
+                let delta = p.dbl && pi>0 && b.pulls[pi-1].at===p.at ? 0 : (p.box ? 0 : p.at - prevAt);
+                if(!p.box) bTargetPulls += delta;
+                totalTargetPulls += delta;
+
+                // 角色歸類（用 icon 判斷）
+                let charKey = charNames[p.icon] || '其他';
+                if(!charMap[charKey]) charMap[charKey]={icon:p.icon,cards:0,pulls:0,dia:0,gift:0,stdCards:0,stdDia:0,stdPulls:0,list:[]};
+                charMap[charKey].cards++;
+                charMap[charKey].pulls += delta;
+                charMap[charKey].dia += p.dia;
+                charMap[charKey].list.push({name:p.n, pulls:delta, dia:p.dia, banner:b.name, box:p.box, dbl:p.dbl});
+
+                // 存到 targetCards（歐非排行用）
+                targetCards.push({
+                    name:p.n, icon:p.icon, pulls:delta, dia:p.dia, gift:0,
+                    banner:b.name, date:b.date, box:!!p.box, dbl:!!p.dbl
+                });
+            }
+            // 更新 prevAt（雙蛋黃第二張不更新）
+            if(!p.dbl || pi===0 || b.pulls[pi-1].at!==p.at) prevAt=p.at;
+        });
+
+        // === 禮包分配 ===
+        // 禮包按該期目標卡數均分，每張目標卡分到 gift/bTargetCards
+        if(b.gift>0 && bTargetCards>0){
+            let giftPerCard = Math.round(b.gift / bTargetCards);
+            // 補到 targetCards（歐非排行顯示用）
+            for(let ti=targetCards.length-bTargetCards; ti<targetCards.length; ti++){
+                targetCards[ti].gift = giftPerCard;
+            }
+            // 補到 charMap（角色分析顯示用）
+            let charCount = {};
+            b.pulls.forEach(p=>{
+                if(!p.std && !p.extra){
+                    let ck = charNames[p.icon] || '其他';
+                    charCount[ck] = (charCount[ck]||0) + 1;
+                }
+            });
+            Object.keys(charCount).forEach(ck=>{
+                if(charMap[ck]) charMap[ck].gift += giftPerCard * charCount[ck];
+            });
+        }
+
+        // === 每期卡池統計 ===
+        bannerStats.push({
+            idx:bi, date:b.date, name:b.name, tag:b.tag, type:b.type,
+            pulls:bPulls,              // 該期總抽數
+            dia:bDia,                  // 該期總鑽石
+            gift:b.gift,               // 該期禮包
+            cards:bTargetCards,        // 該期目標卡數
+            stdCards:bStdCards,        // 該期常駐卡數
+            bTargetDia:bTargetDia,     // 該期目標鑽石（含加抽）
+            bStdDia:bStdDia,           // 該期常駐鑽石
+            // 單卡鑽石 = 該期鑽石 ÷ 卡數
+            costPerCard: (bTargetCards+bStdCards)? Math.round(bDia/(bTargetCards+bStdCards)):0,        // 全部
+            costPerTarget: bTargetCards? Math.round(bTargetDia/bTargetCards):0,                        // 僅目標
+            costPerStd: bStdCards? Math.round(bStdDia/bStdCards):0,                                   // 僅常駐
+            // 單卡禮包 = 該期禮包 ÷ 卡數（禮包無法精確拆分，均分）
+            giftPerCard: (bTargetCards+bStdCards)? Math.round(b.gift/(bTargetCards+bStdCards)):0,      // 全部
+            giftPerTarget: bTargetCards? Math.round(b.gift/bTargetCards):0,                            // 僅目標
+            giftPerStd: bStdCards? Math.round(b.gift/bStdCards):0,                                    // 僅常駐
+            // 平均抽數/張 = 該期抽數 ÷ 卡數
+            pullsPerCard: (bTargetCards+bStdCards)? Math.round(bPulls/(bTargetCards+bStdCards)):0,     // 全部
+            pullsPerTarget: bTargetCards? Math.round(bTargetPulls/bTargetCards):0,                     // 僅目標
+            pullsPerStd: bStdCards? Math.round((bPulls-bTargetPulls)/bStdCards):0,                    // 僅常駐
+        });
+    });
+
+    // === 全域平均計算 ===
+
+    // 常駐 = 總 - 目標（用減法確保 目標+常駐=總 一定成立）
+    let totalStdPulls = totalPulls - totalTargetPulls;
+    totalStdDia = totalDia - totalTargetDia;
+
+    // 平均幾抽出一張 = 總抽數 ÷ 卡數
+    let avgPullsPerCard = (totalCards+totalStd) ? Math.round(totalPulls/(totalCards+totalStd)) : 0;  // 全部
+    let avgTargetPulls = totalCards ? Math.round(totalTargetPulls/totalCards) : 0;                    // 僅目標
+    let avgStdPulls = totalStd ? Math.round(totalStdPulls/totalStd) : 0;                             // 僅常駐
+
+    // 單卡平均鑽石 = 總鑽石 ÷ 卡數（目標鑽石含加抽）
+    let avgDiaPerCard = (totalCards+totalStd) ? Math.round(totalDia/(totalCards+totalStd)) : 0;      // 全部
+    let avgDiaPerTarget = totalCards ? Math.round(totalTargetDia/totalCards) : 0;                     // 僅目標
+    let avgDiaPerStd = totalStd ? Math.round(totalStdDia/totalStd) : 0;                              // 僅常駐
+    let avgDiaPerPull = totalPulls ? Math.round(totalDia/totalPulls*100)/100 : 0;                    // 每抽平均鑽石
+
+    // 禮包拆分：按卡片數比例均分（目標+常駐=總 用減法確保一致）
+    let totalTargetGift = (totalCards+totalStd) ? Math.round(totalGift * totalCards / (totalCards+totalStd)) : 0;
+    let totalStdGift = totalGift - totalTargetGift;
+    // 單卡平均禮包 = 總禮包 ÷ 卡數
+    let avgGiftPerCard = (totalCards+totalStd) ? Math.round(totalGift/(totalCards+totalStd)) : 0;    // 全部
+    let avgGiftPerTarget = totalCards ? Math.round(totalTargetGift/totalCards) : 0;                   // 僅目標
+    let avgGiftPerStd = totalStd ? Math.round(totalStdGift/totalStd) : 0;                            // 僅常駐
+    let avgGiftPerPull = totalPulls ? Math.round(totalGift/totalPulls*100)/100 : 0;                  // 每抽平均禮包
+    let avgGiftPerBanner = totalBanners ? Math.round(totalGift/totalBanners) : 0;                    // 每期平均禮包
+    let avgDiaPerBanner = totalBanners ? Math.round(totalDia/totalBanners) : 0;                      // 每期平均鑽石
+    let freeCards = targetCards.filter(c=>c.dia===0).length;
+    let maxDiaVal = Math.max(...bannerStats.map(b=>b.dia));
+    let maxDiaBanners = bannerStats.filter(b=>b.dia===maxDiaVal);
+    let minDiaVal = Math.min(...bannerStats.filter(b=>b.pulls>0).map(b=>b.dia));
+    let minDiaBanners = bannerStats.filter(b=>b.pulls>0 && b.dia===minDiaVal);
+    let maxGiftVal = Math.max(...bannerStats.map(b=>b.gift));
+    let maxGiftBanners = bannerStats.filter(b=>b.gift===maxGiftVal);
+    let minGiftVal = Math.min(...bannerStats.filter(b=>b.pulls>0).map(b=>b.gift));
+    let minGiftBanners = bannerStats.filter(b=>b.pulls>0 && b.gift===minGiftVal);
+    return {totalPulls,totalDia,totalGift,totalCards,totalStd,totalStdPulls,totalTargetPulls,
+            totalTargetDia,totalStdDia,totalTargetGift,totalStdGift,totalBanners,
+            targetCards,charMap,bannerStats,avgPullsPerCard,avgTargetPulls,avgStdPulls,
+            avgDiaPerCard,avgDiaPerTarget,avgDiaPerStd,avgDiaPerPull,
+            avgGiftPerCard,avgGiftPerTarget,avgGiftPerStd,avgGiftPerPull,avgGiftPerBanner,avgDiaPerBanner,
+            freeCards,maxDiaVal,maxDiaBanners,minDiaVal,minDiaBanners,
+            maxGiftVal,maxGiftBanners,minGiftVal,minGiftBanners,
+            dblYolks,boxes};
+}
+
+// ============================
+// 渲染
+// ============================
+function toggleSec(el){
+    var body = el.nextElementSibling;
+    var arrow = el.querySelector('.arrow');
+    if(body.style.display==='none'){body.style.display='';arrow.textContent='▼'}
+    else{body.style.display='none';arrow.textContent='▶'}
+}
+function render(){
+    const d = compute();
+    const app = document.getElementById('app');
+    let h = '';
+
+    // --- 標題 ---
+    h += `<div class="hero">
+        <h1>戀與深空 抽卡紀錄</h1>
+        <div class="sub">全 ${d.totalBanners} 期卡池完整數據分析 ── <span style="display:inline-block">2025/7 ~ 2026/4</span></div>
+    </div>`;
+
+    // --- 總覽數據 ---
+    h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📊 總覽數據<span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body">
+    <div class="stats-grid">
+        <div class="stat-box"><div class="label">總抽數</div><div class="val" style="color:var(--blue)">${d.totalPulls.toLocaleString()}</div><div class="note">目標 ${d.totalTargetPulls.toLocaleString()} + 常駐 ${d.totalStdPulls.toLocaleString()}</div></div>
+        <div class="stat-box"><div class="label">總獲得卡片</div><div class="val" style="color:var(--accent)">${d.totalCards + d.totalStd}</div><div class="note">目標 ${d.totalCards} + 常駐 ${d.totalStd}</div></div>
+        <!-- <div class="stat-box"><div class="label">免費取得</div><div class="val" style="color:var(--green)">${d.freeCards} 張</div><div class="note">0 鑽出卡</div></div> -->
+        <div class="stat-box"><div class="label">總平均幾抽出一張</div><div class="val" style="color:var(--green)">${d.avgPullsPerCard} 抽</div><div class="note">目標 ${d.avgTargetPulls} + 常駐 ${d.avgStdPulls}</div></div>
+        <div class="stat-box"><div class="label">雙蛋黃次數</div><div class="val" style="color:var(--yellow)">🥚 ${d.dblYolks}</div></div>
+        <div class="stat-box"><div class="label">開盒子次數</div><div class="val" style="color:var(--green)">📦 ${d.boxes}</div></div>
+    </div>
+    <div class="dia-gift-outer" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px">
+        <!-- 鑽石區 -->
+        <div style="background:rgba(252,165,165,.06);border:1px solid rgba(252,165,165,.12);border-radius:14px;padding:18px 20px">
+            <div style="font-size:.85em;font-weight:700;color:var(--red);margin-bottom:12px;letter-spacing:1px">💎 鑽石花費</div>
+            <div class="stats-grid" class="dia-gift-grid" style="margin-bottom:0">
+                <div class="stat-box"><div class="label">總花費</div><div class="val" style="color:var(--red)">${d.totalDia.toLocaleString()}</div><div class="note">目標 ${d.totalTargetDia.toLocaleString()} + 常駐 ${d.totalStdDia.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">單卡平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerCard.toLocaleString()}</div><div class="note">目標 ${d.avgDiaPerTarget.toLocaleString()} + 常駐 ${d.avgDiaPerStd.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">每抽平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerPull}</div></div>
+                <div class="stat-box"><div class="label">每期平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerBanner.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">最燒鑽卡池</div><div class="val" style="color:var(--red)">${d.maxDiaVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.maxDiaBanners.map(b=>b.name).join('<br>')}</div></div>
+                <div class="stat-box"><div class="label">最省鑽卡池</div><div class="val" style="color:var(--green)">${d.minDiaVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.minDiaBanners.map(b=>b.name).join('<br>')}</div></div>
+            </div>
+        </div>
+        <!-- 禮包區 -->
+        <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.12);border-radius:14px;padding:18px 20px">
+            <div style="font-size:.85em;font-weight:700;color:var(--yellow);margin-bottom:12px;letter-spacing:1px">💰 禮包花費</div>
+            <div class="stats-grid" class="dia-gift-grid" style="margin-bottom:0">
+                <div class="stat-box"><div class="label">總花費</div><div class="val" style="color:var(--yellow)">${d.totalGift.toLocaleString()}</div><div class="note">目標 ${d.totalTargetGift.toLocaleString()} + 常駐 ${d.totalStdGift.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">單卡平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerCard.toLocaleString()}</div><div class="note">目標 ${d.avgGiftPerTarget.toLocaleString()} + 常駐 ${d.avgGiftPerStd.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">每抽平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerPull}</div></div>
+                <div class="stat-box"><div class="label">每期平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerBanner.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">最燒禮包卡池</div><div class="val" style="color:var(--yellow)">${d.maxGiftVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.maxGiftBanners.map(b=>b.name).join('<br>')}</div></div>
+                <div class="stat-box"><div class="label">最省禮包卡池</div><div class="val" style="color:var(--green)">${d.minGiftVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.minGiftBanners.map(b=>b.name).join('<br>')}</div></div>
+            </div>
+        </div>
+    </div>
+    </div></div>`;
+
+    // --- 抽卡成本趨勢圖 ---
+    h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📈 抽卡成本趨勢<span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body">
+        <div class="chart-wrap"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="toggle-wrap"><span class="toggle-switch" id="togStd1"></span> 包含常駐</span></div><div style="height:350px"><canvas id="chartTrend"></canvas></div></div>
+        <div class="chart-wrap"><div style="height:350px"><canvas id="chartDiaTrend"></canvas></div></div>
+        <div class="chart-wrap"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="toggle-wrap"><span class="toggle-switch" id="togStd2"></span> 包含常駐</span></div><div style="height:350px"><canvas id="chartPerCard"></canvas></div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">
+            <div class="chart-wrap"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="toggle-wrap"><span class="toggle-switch" id="togStdPie1"></span> 包含常駐</span></div><div style="height:320px"><canvas id="chartPie"></canvas></div></div>
+            <div class="chart-wrap"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="toggle-wrap"><span class="toggle-switch" id="togStdPie2"></span> 包含常駐</span></div><div style="height:320px"><canvas id="chartPieGift"></canvas></div></div>
+        </div>
+    </div></div>`;
+
+    // --- 角色分析 ---
+    h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">🎭 角色分析 <span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body"><div style="display:flex;justify-content:flex-end;margin-bottom:12px"><span class="toggle-wrap" style="font-size:.85em"><span class="toggle-switch" id="togStdChar"></span> 包含常駐</span></div>
+    <div id="charGridWrap" class="char-grid"></div></div></div>`;
+
+    // --- 歐非排行 ---
+    h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">🍀 歐皇 vs 非洲 排行（目標卡 幾抽出）<span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body">`;
+    let sorted = d.targetCards.filter(c=>!c.box && c.pulls>0).sort((a,b)=>a.pulls-b.pulls);
+    // 最歐
+    h += `<div style="margin-bottom:12px"><span style="color:var(--green);font-weight:700">🍀 最歐 TOP 10</span></div>`;
+    h += `<table class="rank-tbl"><thead><tr><th>#</th><th>卡片</th><th>幾抽出</th><th>花費鑽石</th><th>花費禮包</th><th>卡池</th></tr></thead><tbody>`;
+    sorted.slice(0,10).forEach((c,i)=>{
+        h += `<tr><td>${i+1}</td><td class="left">${c.icon} ${c.name}</td><td class="c-green">${c.pulls} 抽</td><td>${c.dia>0?'💎 '+c.dia.toLocaleString():'<span class="c-green">0</span>'}</td><td class="c-yellow">💰 ${c.gift.toLocaleString()}</td><td class="c-dim">【${c.banner}】</td></tr>`;
+    });
+    h += `</tbody></table>`;
+    // 最非
+    let sortedR = [...sorted].reverse();
+    h += `<div style="margin:16px 0 12px"><span style="color:var(--red);font-weight:700">😭 最非 TOP 10</span></div>`;
+    h += `<table class="rank-tbl"><thead><tr><th>#</th><th>卡片</th><th>幾抽出</th><th>花費鑽石</th><th>花費禮包</th><th>卡池</th></tr></thead><tbody>`;
+    sortedR.slice(0,10).forEach((c,i)=>{
+        h += `<tr><td>${i+1}</td><td class="left">${c.icon} ${c.name}</td><td class="c-red">${c.pulls} 抽</td><td>${c.dia>0?'💎 '+c.dia.toLocaleString():'<span class="c-green">0</span>'}</td><td class="c-yellow">💰 ${c.gift.toLocaleString()}</td><td class="c-dim">【${c.banner}】</td></tr>`;
+    });
+    h += `</tbody></table></div></div>`;
+
+    // (已合併到抽卡成本趨勢)
+
+    // --- 卡池明細 ---
+    h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📋 卡池明細（由新到舊）<span class="arrow" style="font-size:.7em">▶</span></div><div class="sec-body" style="display:none">`;
+    // filter bar
+    h += `<div class="filter-bar">
+        <button class="filter-btn active" data-f="all">全部</button>
+        <button class="filter-btn" data-f="全員">全員卡</button>
+        <button class="filter-btn" data-f="日卡首次">日卡首次</button>
+        <button class="filter-btn" data-f="日卡復刻">日卡復刻</button>
+        <button class="filter-btn" data-f="生日卡">生日卡</button>
+        <button class="filter-btn" data-f="限定">限定</button>
+        <button class="filter-btn" data-f="復刻">復刻</button>
+    </div>`;
+    h += `<div id="bannerList">`;
+    for(let i=banners.length-1;i>=0;i--){
+        let b=banners[i];
+        h += `<div class="banner-card" data-type="${b.type||''}">`;
+        h += `<div class="banner-hd"><span class="banner-name">【${b.name}】<span style="font-size:.75em;font-weight:400;color:var(--text-dim);margin-left:6px">${b.tag}</span></span><span class="banner-date">${b.date}</span></div>`;
+        if(b.skip){
+            if(b.cards.length) h += `<div class="banner-tags">${b.cards.map(c=>'<span class="tag">'+c+'</span>').join('')}</div>`;
+            h += `<div class="banner-tags"><span class="tag skip">忘記抽</span></div></div>`;
+            continue;
+        }
+        // 搭檔身分獨立一行
+        if(b.partner) h += `<div style="margin-bottom:8px"><span class="tag partner" style="font-size:.82em;padding:5px 14px">搭檔身分：${b.partner}</span></div>`;
+        // 卡面 tags
+        h += `<div class="banner-tags">`;
+        b.cards.forEach(c=>h+=`<span class="tag">${c}</span>`);
+        h += `</div>`;
+        // table
+        h += `<table class="pull-tbl"><thead><tr><th>#</th><th>項目</th><th>幾抽出</th><th>累計抽數</th><th>花費鑽石</th><th>備註</th></tr></thead><tbody>`;
+        let prevAt2=0;
+        b.pulls.forEach((p,pi)=>{
+            let isDblSecond = p.dbl && pi>0 && b.pulls[pi-1].at===p.at;
+            let delta = isDblSecond ? 0 : (p.box ? 0 : p.at - prevAt2);
+            let notes=[];
+            if(p.std) notes.push('常駐');
+            if(p.dbl) notes.push('雙蛋黃');
+            if(p.box) notes.push('開盒子');
+            if(p.extra) notes.push('額外');
+            let diaClass = p.dia===0?'c-green':'c-red';
+            let rowStyle = p.std ? 'background:rgba(255,255,255,.02);border-left:3px solid rgba(255,255,255,.15)' : 'border-left:3px solid var(--accent)';
+            let nameStyle = p.std ? 'color:var(--text-dim)' : '';
+            h += `<tr style="${rowStyle}">
+                <td>${pi+1}</td>
+                <td class="left" style="${nameStyle}">${p.std ? p.n+' '+p.icon : p.icon+' '+p.n}</td>
+                <td class="c-blue">${delta>0?delta+' 抽':(p.box?'—':'0')}</td>
+                <td class="c-dim">${p.at}</td>
+                <td class="${diaClass}">${p.dia===0?'0':'💎 '+p.dia.toLocaleString()}</td>
+                <td class="c-dim" style="font-size:.76em">${notes.join(' ')}</td>
+            </tr>`;
+            if(!isDblSecond) prevAt2=p.at;
+        });
+        h += `</tbody></table>`;
+        // gift
+        if(b.gift>0){
+            h += `<div class="gift-bar"><span class="lbl">禮包：<span class="c-dim" style="font-size:.85em">${b.giftFormula}</span></span><span class="amt">💰 ${b.gift.toLocaleString()}</span></div>`;
+        }
+        // banner summary
+        let bs = d.bannerStats.find(s=>s.idx===i);
+        if(bs){
+            h += `<div class="banner-summary">
+                <span class="chip">總抽 <b class="c-blue">${bs.pulls}</b></span>
+                <span class="chip">得卡 <b style="color:var(--accent)">${bs.cards + bs.stdCards} 張</b> <span class="c-dim" style="font-size:.8em">目標 ${bs.cards} + 常駐 ${bs.stdCards}</span></span>
+                ${(bs.cards||bs.stdCards)?`<span class="chip">平均 <b class="c-green">${bs.pullsPerCard} 抽/張</b> <span class="c-dim" style="font-size:.8em">目標 ${bs.pullsPerTarget} + 常駐 ${bs.pullsPerStd}</span></span>`:''}
+                <span class="chip">鑽石 <b class="c-red">💎 ${bs.dia.toLocaleString()}</b></span>
+                ${(bs.cards||bs.stdCards)?`<span class="chip">單卡鑽石 <b class="c-red">💎 ${bs.costPerCard.toLocaleString()}</b> <span class="c-dim" style="font-size:.8em">目標 ${bs.costPerTarget.toLocaleString()} + 常駐 ${bs.costPerStd.toLocaleString()}</span></span>`:''}
+                <span class="chip">禮包 <b class="c-yellow">💰 ${bs.gift.toLocaleString()}</b></span>
+                ${(bs.cards||bs.stdCards)?`<span class="chip">單卡禮包 <b class="c-yellow">💰 ${bs.giftPerCard.toLocaleString()}</b> <span class="c-dim" style="font-size:.8em">均分</span></span>`:''}
+            </div>`;
+        }
+        h += `</div>`;
+    }
+    h += `</div></div></div>`;
+
+    app.innerHTML = h;
+
+    // --- 篩選功能 ---
+    document.querySelectorAll('.filter-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            let f = btn.dataset.f;
+            document.querySelectorAll('.banner-card').forEach(card=>{
+                card.style.display = (f==='all' || card.dataset.type===f) ? '' : 'none';
+            });
+        });
+    });
+
+    // --- 圖表 ---
+    let includeStd = false;
+    drawCharts(d, includeStd);
+
+    // --- 開關功能（各自控制）---
+    var includeStd1 = false, includeStd2 = false;
+    document.getElementById('togStd1').addEventListener('click', function(){
+        includeStd1 = !includeStd1;
+        this.classList.toggle('on', includeStd1);
+        if(chartInstances[0]) chartInstances[0].destroy();
+        chartInstances[0] = drawChart1(d, includeStd1);
+    });
+    document.getElementById('togStd2').addEventListener('click', function(){
+        includeStd2 = !includeStd2;
+        this.classList.toggle('on', includeStd2);
+        if(chartInstances[2]) chartInstances[2].destroy();
+        chartInstances[2] = drawChart25(d, includeStd2);
+    });
+    var includeStdPie1 = false, includeStdPie2 = false;
+    document.getElementById('togStdPie1').addEventListener('click', function(){
+        includeStdPie1 = !includeStdPie1;
+        this.classList.toggle('on', includeStdPie1);
+        if(chartInstances[3]) chartInstances[3].destroy();
+        chartInstances[3] = drawChartPie(d, includeStdPie1);
+    });
+    document.getElementById('togStdPie2').addEventListener('click', function(){
+        includeStdPie2 = !includeStdPie2;
+        this.classList.toggle('on', includeStdPie2);
+        if(chartInstances[4]) chartInstances[4].destroy();
+        chartInstances[4] = drawChartPieGift(d, includeStdPie2);
+    });
+
+    // --- 角色分析開關 ---
+    renderCharGrid(d, false);
+    var includeStdChar = false;
+    document.getElementById('togStdChar').addEventListener('click', function(){
+        includeStdChar = !includeStdChar;
+        this.classList.toggle('on', includeStdChar);
+        renderCharGrid(d, includeStdChar);
+    });
+}
+
+function renderCharGrid(d, includeStd){
+    const charOrder = ['沈星回','黎深','祁煜','秦徹','夏以晝'];
+    const charColor = {'沈星回':'#fbbf24','黎深':'#34d399','祁煜':'#60a5fa','秦徹':'#f87171','夏以晝':'#a78bfa'};
+    const charIcon2 = {'沈星回':'⭐️','黎深':'🍐','祁煜':'🐟','秦徹':'🐦‍⬛','夏以晝':'🍎'};
+    let h = '';
+    charOrder.forEach(ch=>{
+        let c = d.charMap[ch];
+        if(!c) return;
+        let cards = includeStd ? c.cards + (c.stdCards||0) : c.cards;
+        let pulls = includeStd ? c.pulls + (c.stdPulls||0) : c.pulls;
+        let dia = includeStd ? c.dia + (c.stdDia||0) : c.dia;
+        let gift = includeStd ? c.gift + Math.round((c.stdCards||0) * (d.totalGift/(d.totalCards+d.totalStd))) : c.gift;
+        let avg = cards ? Math.round(pulls/cards) : 0;
+        let avgD = cards ? Math.round(dia/cards) : 0;
+        let avgG = cards ? Math.round(gift/cards) : 0;
+        h += `<div class="char-card" style="border-color:${charColor[ch]}30">
+            <div class="icon">${charIcon2[ch]}</div>
+            <div class="name" style="color:${charColor[ch]}">${ch}</div>
+            <div class="row"><span class="k">卡片數</span><span>${cards} 張${includeStd && c.stdCards ? ' <span class="c-dim" style="font-size:.9em">目標 '+c.cards+' + 常駐 '+(c.stdCards||0)+'</span>' : ''}</span></div>
+            <div class="row"><span class="k">總抽數</span><span class="c-blue">${pulls.toLocaleString()}</span></div>
+            <div class="row"><span class="k">平均幾抽出</span><span class="c-green">${avg} 抽</span></div>
+            <div class="row" style="border-top:1px solid rgba(252,165,165,.15);padding-top:6px;margin-top:4px"><span class="k">總鑽石</span><span class="c-red">💎 ${dia.toLocaleString()}</span></div>
+            <div class="row"><span class="k">單卡平均鑽</span><span class="c-red">💎 ${avgD.toLocaleString()}</span></div>
+            <div class="row" style="border-top:1px solid rgba(251,191,36,.15);padding-top:6px;margin-top:4px"><span class="k">總禮包</span><span class="c-yellow">💰 ${gift.toLocaleString()}</span></div>
+            <div class="row"><span class="k">單卡平均禮包</span><span class="c-yellow">💰 ${avgG.toLocaleString()}</span></div>
+        </div>`;
+    });
+    document.getElementById('charGridWrap').innerHTML = h;
+}
+
+var chartInstances = [];
+function drawCharts(d, includeStd){
+    const bs = d.bannerStats;
+    chartInstances[0] = drawChart1(d, false);
+    chartInstances[1] = drawChart2(d);
+    chartInstances[2] = drawChart25(d, false);
+    chartInstances[3] = drawChartPie(d, false);
+    chartInstances[4] = drawChartPieGift(d, false);
+}
+
+function getShortLabels(d){ return d.bannerStats.map(b=> b.name.length>6 ? b.name.slice(0,6)+'…' : b.name); }
+
+function drawChart1(d, includeStd){
+    const shortLabels = getShortLabels(d);
+    const bs = d.bannerStats;
+    const mode = includeStd ? '含常駐' : '僅目標';
+    const cardsData = bs.map(b=> includeStd ? b.cards+b.stdCards : b.cards);
+    return new Chart(document.getElementById('chartTrend'),{
+        type:'bar',
+        data:{
+            labels: shortLabels,
+            datasets:[
+                {label:'抽數',data:bs.map(b=>b.pulls),backgroundColor:'rgba(96,165,250,.45)',borderColor:'#60a5fa',borderWidth:1,borderRadius:4,yAxisID:'y'},
+                {label:'得卡數（'+mode+'）',data:cardsData,type:'line',borderColor:'#a78bfa',backgroundColor:'#a78bfa',pointRadius:4,pointBackgroundColor:'#a78bfa',tension:.3,yAxisID:'y1'},
+            ]
+        },
+        options:{
+            responsive:true,
+            plugins:{title:{display:true,text:'每期抽數 & 得卡數（'+mode+'）',color:'#a5b4fc',font:{size:14}},legend:{labels:{color:'#8b8fa3'}}},
+            scales:{
+                x:{ticks:{color:'#666',maxRotation:45,font:{size:10}}},
+                y:{title:{display:true,text:'抽數',color:'#60a5fa'},ticks:{color:'#60a5fa'},grid:{color:'rgba(255,255,255,.04)'}},
+                y1:{position:'right',title:{display:true,text:'得卡',color:'#a78bfa'},ticks:{color:'#a78bfa'},grid:{drawOnChartArea:false}},
+            }
+        }
+    });
+}
+
+function drawChart2(d){
+    const shortLabels = getShortLabels(d);
+    const bs = d.bannerStats;
+    let cumDia=0;
+    let cumData = bs.map(b=>{cumDia+=b.dia; return cumDia;});
+    let cumGift=0;
+    let cumGiftData = bs.map(b=>{cumGift+=b.gift; return cumGift;});
+    return new Chart(document.getElementById('chartDiaTrend'),{
+        type:'bar',
+        data:{
+            labels: shortLabels,
+            datasets:[
+                {label:'本期鑽石',data:bs.map(b=>b.dia),backgroundColor:'rgba(252,165,165,.35)',borderColor:'#fca5a5',borderWidth:1,borderRadius:4,yAxisID:'y'},
+                {label:'本期禮包',data:bs.map(b=>b.gift),backgroundColor:'rgba(251,191,36,.3)',borderColor:'#fbbf24',borderWidth:1,borderRadius:4,yAxisID:'y'},
+                {label:'累計鑽石',data:cumData,type:'line',borderColor:'#f87171',backgroundColor:'transparent',pointRadius:3,pointBackgroundColor:'#f87171',tension:.3,yAxisID:'y1'},
+                {label:'累計禮包',data:cumGiftData,type:'line',borderColor:'#facc15',backgroundColor:'transparent',pointRadius:3,pointBackgroundColor:'#facc15',tension:.3,borderDash:[5,3],yAxisID:'y1'},
+            ]
+        },
+        options:{
+            responsive:true,
+            plugins:{title:{display:true,text:'鑽石 & 禮包花費趨勢（含累計）',color:'#a5b4fc',font:{size:14}},legend:{labels:{color:'#8b8fa3'}}},
+            scales:{
+                x:{ticks:{color:'#666',maxRotation:45,font:{size:10}},stacked:false},
+                y:{title:{display:true,text:'本期花費',color:'#fca5a5'},ticks:{color:'#fca5a5'},grid:{color:'rgba(255,255,255,.04)'}},
+                y1:{position:'right',title:{display:true,text:'累計',color:'#fb923c'},ticks:{color:'#fb923c'},grid:{drawOnChartArea:false}},
+            }
+        }
+    });
+}
+
+function drawChart25(d, includeStd){
+    const shortLabels = getShortLabels(d);
+    const bs = d.bannerStats;
+    const mode = includeStd ? '含常駐' : '僅目標';
+    const costData = bs.map(b=> includeStd ? b.costPerCard : b.costPerTarget);
+    const giftCostData = bs.map(b=> includeStd ? b.giftPerCard : b.giftPerTarget);
+    const pullsData = bs.map(b=> includeStd ? b.pullsPerCard : b.pullsPerTarget);
+    return new Chart(document.getElementById('chartPerCard'),{
+        type:'bar',
+        data:{
+            labels: shortLabels,
+            datasets:[
+                {label:'單卡鑽石成本',data:costData,backgroundColor:'rgba(249,168,212,.4)',borderColor:'#f9a8d4',borderWidth:1,borderRadius:4,yAxisID:'y'},
+                {label:'單卡禮包成本',data:giftCostData,backgroundColor:'rgba(253,230,138,.35)',borderColor:'#fde68a',borderWidth:1,borderRadius:4,yAxisID:'y'},
+                {label:'平均抽數/張',data:pullsData,type:'line',borderColor:'#6ee7b7',backgroundColor:'transparent',pointRadius:4,pointBackgroundColor:'#6ee7b7',tension:.3,yAxisID:'y1'},
+            ]
+        },
+        options:{
+            responsive:true,
+            plugins:{title:{display:true,text:'單卡成本 & 平均抽數趨勢（'+mode+'）',color:'#a5b4fc',font:{size:14}},legend:{labels:{color:'#8b8fa3'}}},
+            scales:{
+                x:{ticks:{color:'#666',maxRotation:45,font:{size:10}}},
+                y:{title:{display:true,text:'單卡成本',color:'#f9a8d4'},ticks:{color:'#f9a8d4'},grid:{color:'rgba(255,255,255,.04)'}},
+                y1:{position:'right',title:{display:true,text:'抽數/張',color:'#6ee7b7'},ticks:{color:'#6ee7b7'},grid:{drawOnChartArea:false}},
+            }
+        }
+    });
+}
+
+function drawChartPie(d, includeStd){
+    const charOrder = ['沈星回','黎深','祁煜','秦徹','夏以晝'];
+    const charColors = ['#fbbf24','#34d399','#60a5fa','#f87171','#a78bfa'];
+    const mode = includeStd ? '含常駐' : '僅目標';
+    let pieData = charOrder.map(ch=>{
+        let c = d.charMap[ch];
+        if(!c) return 0;
+        return includeStd ? c.dia + (c.stdDia||0) : c.dia;
+    });
+    return new Chart(document.getElementById('chartPie'),{
+        type:'doughnut',
+        data:{
+            labels: charOrder.map((ch,i)=>ch+' (💎'+pieData[i].toLocaleString()+')'),
+            datasets:[{
+                data: pieData,
+                backgroundColor: charColors.map(c=>c+'99'),
+                borderColor: charColors,
+                borderWidth:2, hoverOffset:8
+            }]
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                title:{display:true,text:'各角色鑽石花費佔比（'+mode+'）',color:'#a5b4fc',font:{size:14}},
+                legend:{position:'bottom',labels:{color:'#8b8fa3',padding:12,font:{size:11}}}
+            }
+        }
+    });
+}
+
+function drawChartPieGift(d, includeStd){
+    const charOrder = ['沈星回','黎深','祁煜','秦徹','夏以晝'];
+    const charColors = ['#fbbf24','#34d399','#60a5fa','#f87171','#a78bfa'];
+    const mode = includeStd ? '含常駐' : '僅目標';
+    let pieGiftData = charOrder.map(ch=>{
+        let c = d.charMap[ch];
+        if(!c) return 0;
+        // 常駐的禮包用均分方式：常駐卡數 × 每張卡的禮包均分
+        return includeStd ? c.gift + Math.round((c.stdCards||0) * (d.totalGift/(d.totalCards+d.totalStd))) : c.gift;
+    });
+    return new Chart(document.getElementById('chartPieGift'),{
+        type:'doughnut',
+        data:{
+            labels: charOrder.map((ch,i)=>ch+' (💰'+pieGiftData[i].toLocaleString()+')'),
+            datasets:[{
+                data: pieGiftData,
+                backgroundColor: charColors.map(c=>c+'99'),
+                borderColor: charColors,
+                borderWidth:2, hoverOffset:8
+            }]
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                title:{display:true,text:'各角色禮包花費佔比（'+mode+'）',color:'#a5b4fc',font:{size:14}},
+                legend:{position:'bottom',labels:{color:'#8b8fa3',padding:12,font:{size:11}}}
+            }
+        }
+    });
+}
+
+// 回到頂端
+document.getElementById('btnTop').addEventListener('click',function(){
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+});
+window.addEventListener('scroll',function(){
+    var btn = document.getElementById('btnTop');
+    if(window.scrollY > 400 || document.documentElement.scrollTop > 400){
+        btn.classList.add('show');
+    } else {
+        btn.classList.remove('show');
+    }
+});
+
+// 全域設定 Chart.js
+Chart.defaults.responsive = true;
+Chart.defaults.maintainAspectRatio = false;
+
+// 視窗縮放時強制重繪所有圖表
+window.addEventListener('resize', function(){
+    Object.values(Chart.instances).forEach(function(chart){
+        chart.resize();
+    });
+});
+
+// 啟動
+render();
+</script>
+</body>
+</html>
