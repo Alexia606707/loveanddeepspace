@@ -85,11 +85,13 @@
             font-size:1.25em; font-weight:700; color:var(--accent);
             margin-bottom:18px; margin-top:12px; padding:10px 16px;
             border-left:4px solid var(--accent);
-            background:rgba(167,139,250,.06);
+            /* background:rgba(167,139,250,.06); */
+            background:rgba(22,20,50,.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
             border-radius:0 8px 8px 0;
             cursor:pointer; user-select:none;
             letter-spacing:2px;
             display:flex; align-items:center;
+            position:sticky; top:0; z-index:20;
         }
         .section-title .arrow { margin-left:auto; }
 
@@ -173,9 +175,14 @@
             transition: all .2s;
         }
         .filter-btn:hover, .filter-btn.active { background:rgba(167,139,250,.15); border-color:var(--accent); color:var(--accent); }
+        .chart-range-btn { background:#1a1735; }
+        .chart-range-btn:hover, .chart-range-btn.active { background:rgba(167,139,250,.25); }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1); }
 
         /* ===== RWD ===== */
+        .mob-br { display:none; }
         @media(max-width:700px){
+            .mob-br { display:inline; }
             .hero h1 { font-size:1.6em; }
             .hero { padding:24px 16px 20px; }
             .stats-grid { grid-template-columns:repeat(2,1fr); }
@@ -186,7 +193,7 @@
         }
         @media(max-width:450px){
             .stats-grid { grid-template-columns:repeat(2,1fr); gap:8px; }
-            .dia-gift-grid { grid-template-columns:1fr; }
+            .dia-gift-grid { grid-template-columns:repeat(2,1fr); }
             .stat-box .val { font-size:1.2em; }
             .stat-box .note { white-space:normal; }
         }
@@ -548,8 +555,8 @@ function compute(){
     let totalStdDia=0;       // 常駐鑽石（常駐卡的 dia 加總，最後會用減法修正）
     let targetCards=[];      // 每張目標卡的詳細資料（用於歐非排行）
     let charMap={};          // 角色統計（按 icon 歸類）
-    let bannerStats=[];      // 每期卡池統計
-    let luckyList=[], costlyList=[];
+    let bannerStats=[];      // 每池卡池統計
+    // let luckyList=[], costlyList=[];
     let dblYolks=0;          // 雙蛋黃次數
     let boxes=0;             // 開盒子次數
 
@@ -652,7 +659,7 @@ function compute(){
             });
         }
 
-        // === 每期卡池統計 ===
+        // === 每池卡池統計 ===
         bannerStats.push({
             idx:bi, date:b.date, name:b.name, tag:b.tag, type:b.type,
             pulls:bPulls,              // 該期總抽數
@@ -702,8 +709,23 @@ function compute(){
     let avgGiftPerTarget = totalCards ? Math.round(totalTargetGift/totalCards) : 0;                   // 僅目標
     let avgGiftPerStd = totalStd ? Math.round(totalStdGift/totalStd) : 0;                            // 僅常駐
     let avgGiftPerPull = totalPulls ? Math.round(totalGift/totalPulls*100)/100 : 0;                  // 每抽平均禮包
-    let avgGiftPerBanner = totalBanners ? Math.round(totalGift/totalBanners) : 0;                    // 每期平均禮包
-    let avgDiaPerBanner = totalBanners ? Math.round(totalDia/totalBanners) : 0;                      // 每期平均鑽石
+    let avgGiftPerBanner = totalBanners ? Math.round(totalGift/totalBanners) : 0;                    // 每池平均禮包
+    let avgDiaPerBanner = totalBanners ? Math.round(totalDia/totalBanners) : 0;                      // 每池平均鑽石
+
+    // === 每月平均計算 ===
+    // 用每個卡池起始日期的年月來統計有幾個不同月份
+    let monthSet = new Set();
+    bannerStats.forEach(b => {
+        let dateStr = b.date.split('-')[0]; // 取起始日期，如 '2025/7/3'
+        let parts = dateStr.split('/');
+        let ym = parts[0] + '/' + parts[1]; // '2025/7'
+        monthSet.add(ym);
+    });
+    let totalMonths = monthSet.size || 1;
+    let avgDiaPerMonth = Math.round(totalDia / totalMonths);                                         // 每月平均鑽石
+    let avgGiftPerMonth = Math.round(totalGift / totalMonths);                                       // 每月平均禮包
+    let avgPullsPerMonth = Math.round(totalPulls / totalMonths);                                     // 每月平均抽數
+    let avgCardsPerMonth = Math.round((totalCards + totalStd) * 100 / totalMonths) / 100;            // 每月平均卡數
     let freeCards = targetCards.filter(c=>c.dia===0).length;
     let maxDiaVal = Math.max(...bannerStats.map(b=>b.dia));
     let maxDiaBanners = bannerStats.filter(b=>b.dia===maxDiaVal);
@@ -714,10 +736,11 @@ function compute(){
     let minGiftVal = Math.min(...bannerStats.filter(b=>b.pulls>0).map(b=>b.gift));
     let minGiftBanners = bannerStats.filter(b=>b.pulls>0 && b.gift===minGiftVal);
     return {totalPulls,totalDia,totalGift,totalCards,totalStd,totalStdPulls,totalTargetPulls,
-            totalTargetDia,totalStdDia,totalTargetGift,totalStdGift,totalBanners,
+            totalTargetDia,totalStdDia,totalTargetGift,totalStdGift,totalBanners,totalMonths,
             targetCards,charMap,bannerStats,avgPullsPerCard,avgTargetPulls,avgStdPulls,
             avgDiaPerCard,avgDiaPerTarget,avgDiaPerStd,avgDiaPerPull,
             avgGiftPerCard,avgGiftPerTarget,avgGiftPerStd,avgGiftPerPull,avgGiftPerBanner,avgDiaPerBanner,
+            avgDiaPerMonth,avgGiftPerMonth,avgPullsPerMonth,avgCardsPerMonth,
             freeCards,maxDiaVal,maxDiaBanners,minDiaVal,minDiaBanners,
             maxGiftVal,maxGiftBanners,minGiftVal,minGiftBanners,
             dblYolks,boxes};
@@ -740,7 +763,7 @@ function render(){
     // --- 標題 ---
     h += `<div class="hero">
         <h1>戀與深空 抽卡紀錄</h1>
-        <div class="sub">全 ${d.totalBanners} 期卡池完整數據分析 ── <span style="display:inline-block">2025/7 ~ 2026/4</span></div>
+        <div class="sub">全 ${d.totalBanners} 期卡池完整數據分析 ── <span style="display:inline-block">${d.bannerStats[0].date.split('-')[0].split('/').slice(0,2).join('/')} ~ ${d.bannerStats[d.bannerStats.length-1].date.split('-')[0].split('/').slice(0,2).join('/')}</span></div>
     </div>`;
 
     // --- 總覽數據 ---
@@ -750,6 +773,7 @@ function render(){
         <div class="stat-box"><div class="label">總獲得卡片</div><div class="val" style="color:var(--accent)">${d.totalCards + d.totalStd}</div><div class="note">目標 ${d.totalCards} + 常駐 ${d.totalStd}</div></div>
         <!-- <div class="stat-box"><div class="label">免費取得</div><div class="val" style="color:var(--green)">${d.freeCards} 張</div><div class="note">0 鑽出卡</div></div> -->
         <div class="stat-box"><div class="label">總平均幾抽出一張</div><div class="val" style="color:var(--green)">${d.avgPullsPerCard} 抽</div><div class="note">目標 ${d.avgTargetPulls} + 常駐 ${d.avgStdPulls}</div></div>
+        <div class="stat-box"><div class="label">每月平均</div><div class="val" style="color:var(--blue)">${d.avgPullsPerMonth.toLocaleString()} 抽</div><div class="note">${d.avgCardsPerMonth} 張卡 ∣ 共 ${d.totalMonths} 個月</div></div>
         <div class="stat-box"><div class="label">雙蛋黃次數</div><div class="val" style="color:var(--yellow)">🥚 ${d.dblYolks}</div></div>
         <div class="stat-box"><div class="label">開盒子次數</div><div class="val" style="color:var(--green)">📦 ${d.boxes}</div></div>
     </div>
@@ -757,11 +781,11 @@ function render(){
         <!-- 鑽石區 -->
         <div style="background:rgba(252,165,165,.06);border:1px solid rgba(252,165,165,.12);border-radius:14px;padding:18px 20px">
             <div style="font-size:.85em;font-weight:700;color:var(--red);margin-bottom:12px;letter-spacing:1px">💎 鑽石花費</div>
-            <div class="stats-grid" class="dia-gift-grid" style="margin-bottom:0">
+            <div class="stats-grid dia-gift-grid" style="margin-bottom:0">
                 <div class="stat-box"><div class="label">總花費</div><div class="val" style="color:var(--red)">${d.totalDia.toLocaleString()}</div><div class="note">目標 ${d.totalTargetDia.toLocaleString()} + 常駐 ${d.totalStdDia.toLocaleString()}</div></div>
                 <div class="stat-box"><div class="label">單卡平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerCard.toLocaleString()}</div><div class="note">目標 ${d.avgDiaPerTarget.toLocaleString()} + 常駐 ${d.avgDiaPerStd.toLocaleString()}</div></div>
                 <div class="stat-box"><div class="label">每抽平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerPull}</div></div>
-                <div class="stat-box"><div class="label">每期平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerBanner.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">每池平均</div><div class="val" style="color:var(--red)">${d.avgDiaPerBanner.toLocaleString()}</div><div class="note">每月 ${d.avgDiaPerMonth.toLocaleString()}</div></div>
                 <div class="stat-box"><div class="label">最燒鑽卡池</div><div class="val" style="color:var(--red)">${d.maxDiaVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.maxDiaBanners.map(b=>b.name).join('<br>')}</div></div>
                 <div class="stat-box"><div class="label">最省鑽卡池</div><div class="val" style="color:var(--green)">${d.minDiaVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.minDiaBanners.map(b=>b.name).join('<br>')}</div></div>
             </div>
@@ -769,11 +793,11 @@ function render(){
         <!-- 禮包區 -->
         <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.12);border-radius:14px;padding:18px 20px">
             <div style="font-size:.85em;font-weight:700;color:var(--yellow);margin-bottom:12px;letter-spacing:1px">💰 禮包花費</div>
-            <div class="stats-grid" class="dia-gift-grid" style="margin-bottom:0">
+            <div class="stats-grid dia-gift-grid" style="margin-bottom:0">
                 <div class="stat-box"><div class="label">總花費</div><div class="val" style="color:var(--yellow)">${d.totalGift.toLocaleString()}</div><div class="note">目標 ${d.totalTargetGift.toLocaleString()} + 常駐 ${d.totalStdGift.toLocaleString()}</div></div>
                 <div class="stat-box"><div class="label">單卡平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerCard.toLocaleString()}</div><div class="note">目標 ${d.avgGiftPerTarget.toLocaleString()} + 常駐 ${d.avgGiftPerStd.toLocaleString()}</div></div>
                 <div class="stat-box"><div class="label">每抽平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerPull}</div></div>
-                <div class="stat-box"><div class="label">每期平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerBanner.toLocaleString()}</div></div>
+                <div class="stat-box"><div class="label">每池平均</div><div class="val" style="color:var(--yellow)">${d.avgGiftPerBanner.toLocaleString()}</div><div class="note">每月 ${d.avgGiftPerMonth.toLocaleString()}</div></div>
                 <div class="stat-box"><div class="label">最燒禮包卡池</div><div class="val" style="color:var(--yellow)">${d.maxGiftVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.maxGiftBanners.map(b=>b.name).join('<br>')}</div></div>
                 <div class="stat-box"><div class="label">最省禮包卡池</div><div class="val" style="color:var(--green)">${d.minGiftVal.toLocaleString()}</div><div class="note" style="white-space:normal">${d.minGiftBanners.map(b=>b.name).join('<br>')}</div></div>
             </div>
@@ -782,7 +806,28 @@ function render(){
     </div></div>`;
 
     // --- 抽卡成本趨勢圖 ---
+    // 動態產生年份按鈕
+    let yearSet = new Set();
+    d.bannerStats.forEach(b => { yearSet.add(b.date.split('/')[0]); });
+    let yearBtns = [...yearSet].sort().map(y => `<button class="filter-btn chart-range-btn" data-range="${y}">${y}</button>`).join('');
+    let selStyle = 'background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.85em;min-height:32px';
+
     h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📈 抽卡成本趨勢<span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body">
+        <div id="chartRangeBar" style="position:sticky;top:46px;z-index:10;background:rgba(22,20,50,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:14px;padding:12px 18px;margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button class="filter-btn chart-range-btn active" data-range="all">全部</button>
+            ${yearBtns}
+            <button class="filter-btn chart-range-btn" data-range="half">近半年</button>
+            <button class="filter-btn chart-range-btn" data-range="custom">自訂卡池</button>
+            <button class="filter-btn chart-range-btn" data-range="dateRange">自訂日期</button>
+            <div id="customRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.8em;color:var(--text-dim);width:100%;flex-wrap:wrap;margin-top:4px">
+                <select id="chartFrom" style="${selStyle};max-width:45vw;overflow:hidden;text-overflow:ellipsis"></select>
+                ~ <select id="chartTo" style="${selStyle};max-width:45vw;overflow:hidden;text-overflow:ellipsis"></select>
+            </div>
+            <div id="dateRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.8em;color:var(--text-dim);width:100%;margin-top:4px">
+                <input type="date" id="dateFrom" style="${selStyle}">
+                ~ <input type="date" id="dateTo" style="${selStyle}">
+            </div>
+        </div>
         <div class="chart-wrap"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="toggle-wrap"><span class="toggle-switch" id="togStd1"></span> 包含常駐</span></div><div style="height:350px"><canvas id="chartTrend"></canvas></div></div>
         <div class="chart-wrap"><div style="height:350px"><canvas id="chartDiaTrend"></canvas></div></div>
         <div class="chart-wrap"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="toggle-wrap"><span class="toggle-switch" id="togStd2"></span> 包含常駐</span></div><div style="height:350px"><canvas id="chartPerCard"></canvas></div></div>
@@ -803,7 +848,7 @@ function render(){
     h += `<div style="margin-bottom:12px"><span style="color:var(--green);font-weight:700">🍀 最歐 TOP 10</span></div>`;
     h += `<table class="rank-tbl"><thead><tr><th>#</th><th>卡片</th><th>幾抽出</th><th>花費鑽石</th><th>花費禮包</th><th>卡池</th></tr></thead><tbody>`;
     sorted.slice(0,10).forEach((c,i)=>{
-        h += `<tr><td>${i+1}</td><td class="left">${c.icon} ${c.name}</td><td class="c-green">${c.pulls} 抽</td><td>${c.dia>0?'💎 '+c.dia.toLocaleString():'<span class="c-green">0</span>'}</td><td class="c-yellow">💰 ${c.gift.toLocaleString()}</td><td class="c-dim">【${c.banner}】</td></tr>`;
+        h += `<tr><td>${i+1}</td><td class="left">${c.icon} ${c.name}</td><td class="c-green">${c.pulls} 抽</td><td class="${c.dia>0?'c-red':'c-green'}">💎<br class="mob-br"> ${c.dia.toLocaleString()}</td><td class="c-yellow">💰<br class="mob-br"> ${c.gift.toLocaleString()}</td><td class="c-dim">【${c.banner}】</td></tr>`;
     });
     h += `</tbody></table>`;
     // 最非
@@ -811,11 +856,9 @@ function render(){
     h += `<div style="margin:16px 0 12px"><span style="color:var(--red);font-weight:700">😭 最非 TOP 10</span></div>`;
     h += `<table class="rank-tbl"><thead><tr><th>#</th><th>卡片</th><th>幾抽出</th><th>花費鑽石</th><th>花費禮包</th><th>卡池</th></tr></thead><tbody>`;
     sortedR.slice(0,10).forEach((c,i)=>{
-        h += `<tr><td>${i+1}</td><td class="left">${c.icon} ${c.name}</td><td class="c-red">${c.pulls} 抽</td><td>${c.dia>0?'💎 '+c.dia.toLocaleString():'<span class="c-green">0</span>'}</td><td class="c-yellow">💰 ${c.gift.toLocaleString()}</td><td class="c-dim">【${c.banner}】</td></tr>`;
+        h += `<tr><td>${i+1}</td><td class="left">${c.icon} ${c.name}</td><td class="c-red">${c.pulls} 抽</td><td class="${c.dia>0?'c-red':'c-green'}">💎<br class="mob-br"> ${c.dia.toLocaleString()}</td><td class="c-yellow">💰<br class="mob-br"> ${c.gift.toLocaleString()}</td><td class="c-dim">【${c.banner}】</td></tr>`;
     });
     h += `</tbody></table></div></div>`;
-
-    // (已合併到抽卡成本趨勢)
 
     // --- 卡池明細 ---
     h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📋 卡池明細（由新到舊）<span class="arrow" style="font-size:.7em">▶</span></div><div class="sec-body" style="display:none">`;
@@ -864,7 +907,7 @@ function render(){
                 <td class="left" style="${nameStyle}">${p.std ? p.n+' '+p.icon : p.icon+' '+p.n}</td>
                 <td class="c-blue">${delta>0?delta+' 抽':(p.box?'—':'0')}</td>
                 <td class="c-dim">${p.at}</td>
-                <td class="${diaClass}">${p.dia===0?'0':'💎 '+p.dia.toLocaleString()}</td>
+                <td class="${diaClass}">💎<br class="mob-br"> ${p.dia.toLocaleString()}</td>
                 <td class="c-dim" style="font-size:.76em">${notes.join(' ')}</td>
             </tr>`;
             if(!isDblSecond) prevAt2=p.at;
@@ -893,10 +936,10 @@ function render(){
 
     app.innerHTML = h;
 
-    // --- 篩選功能 ---
-    document.querySelectorAll('.filter-btn').forEach(btn=>{
+    // --- 卡池明細篩選功能 ---
+    document.querySelectorAll('.filter-bar .filter-btn').forEach(btn=>{
         btn.addEventListener('click',()=>{
-            document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+            btn.parentElement.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
             btn.classList.add('active');
             let f = btn.dataset.f;
             document.querySelectorAll('.banner-card').forEach(card=>{
@@ -905,36 +948,139 @@ function render(){
         });
     });
 
-    // --- 圖表 ---
-    let includeStd = false;
-    drawCharts(d, includeStd);
+    // --- 圖表區間篩選（共用連動）---
+    var chartRange = 'all';
+    var customFrom = 0, customTo = d.bannerStats.length - 1;
+    var includeStd1 = false, includeStd2 = false;
+    var includeStdPie1 = false, includeStdPie2 = false;
+
+    // 填充自訂區間下拉選單（加上日期）
+    var selFrom = document.getElementById('chartFrom');
+    var selTo = document.getElementById('chartTo');
+    d.bannerStats.forEach(function(b, i){
+        var sn = b.name.length > 8 ? b.name.slice(0,8)+'…' : b.name;
+        var dateShort = b.date.split('-')[0]; // 取起始日期如 '2025/7/3'
+        var label = (i+1)+'. '+sn+' ('+dateShort+')';
+        selFrom.innerHTML += '<option value="'+i+'">'+label+'</option>';
+        selTo.innerHTML += '<option value="'+i+'">'+label+'</option>';
+    });
+    selTo.value = d.bannerStats.length - 1;
+
+    // 設定日期 input 的預設值和範圍
+    var dateFromInput = document.getElementById('dateFrom');
+    var dateToInput = document.getElementById('dateTo');
+    // 把 '2025/7/3' 轉成 '2025-07-03' 給 input[type=date]
+    function toIsoDate(str){
+        var p = str.split('/');
+        return p[0]+'-'+(p[1].length<2?'0':'')+p[1]+'-'+(p[2].length<2?'0':'')+p[2];
+    }
+    // 把 '2025/7/3' 轉成 Date 物件
+    function parseDate(str){
+        var p = str.split('/');
+        return new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
+    }
+    var firstDate = d.bannerStats[0].date.split('-')[0];
+    var lastDate = d.bannerStats[d.bannerStats.length-1].date.split('-')[0];
+    dateFromInput.value = toIsoDate(firstDate);
+    dateToInput.value = toIsoDate(lastDate);
+
+    function getFilteredData(){
+        var bs = d.bannerStats;
+        if(chartRange === 'all') return Object.assign({}, d, {bannerStats: bs});
+        if(chartRange === 'half'){
+            var n = Math.min(bs.length, Math.ceil(bs.length / 2));
+            return Object.assign({}, d, {bannerStats: bs.slice(bs.length - n)});
+        }
+        if(chartRange === 'custom'){
+            return Object.assign({}, d, {bannerStats: bs.slice(customFrom, customTo + 1)});
+        }
+        if(chartRange === 'dateRange'){
+            var from = new Date(dateFromInput.value);
+            var to = new Date(dateToInput.value);
+            to.setHours(23,59,59); // 包含結束日當天
+            var filtered = bs.filter(function(b){
+                var startDate = parseDate(b.date.split('-')[0]);
+                return startDate >= from && startDate <= to;
+            });
+            return Object.assign({}, d, {bannerStats: filtered});
+        }
+        // 年份
+        return Object.assign({}, d, {bannerStats: bs.filter(function(b){ return b.date.split('/')[0] === chartRange; })});
+    }
+
+    function redrawAllCharts(){
+        var fd = getFilteredData();
+        chartInstances.forEach(function(c){ if(c) c.destroy(); });
+        chartInstances[0] = drawChart1(fd, includeStd1);
+        chartInstances[1] = drawChart2(fd);
+        chartInstances[2] = drawChart25(fd, includeStd2);
+        chartInstances[3] = drawChartPie(fd, includeStdPie1);
+        chartInstances[4] = drawChartPieGift(fd, includeStdPie2);
+    }
+
+    // 區間按鈕事件
+    document.querySelectorAll('.chart-range-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            document.querySelectorAll('.chart-range-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            chartRange = btn.dataset.range;
+            document.getElementById('customRangeWrap').style.display = chartRange === 'custom' ? 'flex' : 'none';
+            document.getElementById('dateRangeWrap').style.display = chartRange === 'dateRange' ? 'flex' : 'none';
+            redrawAllCharts();
+        });
+    });
+
+    // 自訂卡池下拉事件
+    selFrom.addEventListener('change', function(){
+        customFrom = parseInt(this.value);
+        if(customFrom > customTo){ customTo = customFrom; selTo.value = customTo; }
+        if(chartRange === 'custom') redrawAllCharts();
+    });
+    selTo.addEventListener('change', function(){
+        customTo = parseInt(this.value);
+        if(customTo < customFrom){ customFrom = customTo; selFrom.value = customFrom; }
+        if(chartRange === 'custom') redrawAllCharts();
+    });
+
+    // 自訂日期事件
+    dateFromInput.addEventListener('change', function(){
+        if(chartRange === 'dateRange') redrawAllCharts();
+    });
+    dateToInput.addEventListener('change', function(){
+        if(chartRange === 'dateRange') redrawAllCharts();
+    });
+
+    // 初次繪圖
+    redrawAllCharts();
 
     // --- 開關功能（各自控制）---
-    var includeStd1 = false, includeStd2 = false;
     document.getElementById('togStd1').addEventListener('click', function(){
         includeStd1 = !includeStd1;
         this.classList.toggle('on', includeStd1);
+        var fd = getFilteredData();
         if(chartInstances[0]) chartInstances[0].destroy();
-        chartInstances[0] = drawChart1(d, includeStd1);
+        chartInstances[0] = drawChart1(fd, includeStd1);
     });
     document.getElementById('togStd2').addEventListener('click', function(){
         includeStd2 = !includeStd2;
         this.classList.toggle('on', includeStd2);
+        var fd = getFilteredData();
         if(chartInstances[2]) chartInstances[2].destroy();
-        chartInstances[2] = drawChart25(d, includeStd2);
+        chartInstances[2] = drawChart25(fd, includeStd2);
     });
-    var includeStdPie1 = false, includeStdPie2 = false;
     document.getElementById('togStdPie1').addEventListener('click', function(){
         includeStdPie1 = !includeStdPie1;
         this.classList.toggle('on', includeStdPie1);
+        var fd = getFilteredData();
         if(chartInstances[3]) chartInstances[3].destroy();
-        chartInstances[3] = drawChartPie(d, includeStdPie1);
+        chartInstances[3] = drawChartPie(fd, includeStdPie1);
     });
     document.getElementById('togStdPie2').addEventListener('click', function(){
         includeStdPie2 = !includeStdPie2;
         this.classList.toggle('on', includeStdPie2);
+        var fd = getFilteredData();
         if(chartInstances[4]) chartInstances[4].destroy();
-        chartInstances[4] = drawChartPieGift(d, includeStdPie2);
+        chartInstances[4] = drawChartPieGift(fd, includeStdPie2);
     });
 
     // --- 角色分析開關 ---
@@ -978,13 +1124,46 @@ function renderCharGrid(d, includeStd){
 }
 
 var chartInstances = [];
-function drawCharts(d, includeStd){
-    const bs = d.bannerStats;
-    chartInstances[0] = drawChart1(d, false);
-    chartInstances[1] = drawChart2(d);
-    chartInstances[2] = drawChart25(d, false);
-    chartInstances[3] = drawChartPie(d, false);
-    chartInstances[4] = drawChartPieGift(d, false);
+
+// 根據篩選後的 bannerStats 重新計算角色佔比資料
+function buildCharMapFromFiltered(d){
+    const charNames = {'⭐️':'沈星回','🍐':'黎深','🐟':'祁煜','🐦‍⬛':'秦徹','🍎':'夏以晝'};
+    var nameSet = new Set(d.bannerStats.map(function(b){ return b.name; }));
+    var cm = {};
+    var filteredTotalCards = 0, filteredTotalStd = 0, filteredTotalGift = 0;
+    banners.forEach(function(b){
+        if(b.skip || !nameSet.has(b.name)) return;
+        filteredTotalGift += (b.gift||0);
+        var bTargetCards = 0;
+        b.pulls.forEach(function(p, pi){
+            var charKey = charNames[p.icon] || '其他';
+            if(!cm[charKey]) cm[charKey] = {dia:0, gift:0, stdDia:0, stdCards:0};
+            if(p.std){
+                filteredTotalStd++;
+                cm[charKey].stdCards++;
+                cm[charKey].stdDia += p.dia;
+            } else if(!p.extra){
+                filteredTotalCards++;
+                bTargetCards++;
+                cm[charKey].dia += p.dia;
+            }
+        });
+        // 禮包均分到目標卡角色
+        if(b.gift > 0 && bTargetCards > 0){
+            var gpc = Math.round(b.gift / bTargetCards);
+            var charCount = {};
+            b.pulls.forEach(function(p){
+                if(!p.std && !p.extra){
+                    var ck = charNames[p.icon] || '其他';
+                    charCount[ck] = (charCount[ck]||0) + 1;
+                }
+            });
+            Object.keys(charCount).forEach(function(ck){
+                if(cm[ck]) cm[ck].gift += gpc * charCount[ck];
+            });
+        }
+    });
+    return {charMap:cm, totalCards:filteredTotalCards, totalStd:filteredTotalStd, totalGift:filteredTotalGift};
 }
 
 function getShortLabels(d){ return d.bannerStats.map(b=> b.name.length>6 ? b.name.slice(0,6)+'…' : b.name); }
@@ -1005,7 +1184,7 @@ function drawChart1(d, includeStd){
         },
         options:{
             responsive:true,
-            plugins:{title:{display:true,text:'每期抽數 & 得卡數（'+mode+'）',color:'#a5b4fc',font:{size:14}},legend:{labels:{color:'#8b8fa3'}}},
+            plugins:{title:{display:true,text:'每池抽數 & 得卡數（'+mode+'）',color:'#a5b4fc',font:{size:14}},legend:{labels:{color:'#8b8fa3'}}},
             scales:{
                 x:{ticks:{color:'#666',maxRotation:45,font:{size:10}}},
                 y:{title:{display:true,text:'抽數',color:'#60a5fa'},ticks:{color:'#60a5fa'},grid:{color:'rgba(255,255,255,.04)'}},
@@ -1078,8 +1257,10 @@ function drawChartPie(d, includeStd){
     const charOrder = ['沈星回','黎深','祁煜','秦徹','夏以晝'];
     const charColors = ['#fbbf24','#34d399','#60a5fa','#f87171','#a78bfa'];
     const mode = includeStd ? '含常駐' : '僅目標';
+    // 從篩選後的卡池重新計算角色資料
+    const f = buildCharMapFromFiltered(d);
     let pieData = charOrder.map(ch=>{
-        let c = d.charMap[ch];
+        let c = f.charMap[ch];
         if(!c) return 0;
         return includeStd ? c.dia + (c.stdDia||0) : c.dia;
     });
@@ -1108,11 +1289,14 @@ function drawChartPieGift(d, includeStd){
     const charOrder = ['沈星回','黎深','祁煜','秦徹','夏以晝'];
     const charColors = ['#fbbf24','#34d399','#60a5fa','#f87171','#a78bfa'];
     const mode = includeStd ? '含常駐' : '僅目標';
+    // 從篩選後的卡池重新計算角色資料
+    const f = buildCharMapFromFiltered(d);
     let pieGiftData = charOrder.map(ch=>{
-        let c = d.charMap[ch];
+        let c = f.charMap[ch];
         if(!c) return 0;
         // 常駐的禮包用均分方式：常駐卡數 × 每張卡的禮包均分
-        return includeStd ? c.gift + Math.round((c.stdCards||0) * (d.totalGift/(d.totalCards+d.totalStd))) : c.gift;
+        let total = f.totalCards + f.totalStd;
+        return includeStd ? c.gift + (total ? Math.round((c.stdCards||0) * (f.totalGift/total)) : 0) : c.gift;
     });
     return new Chart(document.getElementById('chartPieGift'),{
         type:'doughnut',
