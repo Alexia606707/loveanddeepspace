@@ -72,6 +72,9 @@
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             border-color:var(--accent);
         }
+        .form-group select option {
+            background:#1a1040; color:#e0e0e0;
+        }
         /* 已填入內容的欄位高亮 */
         .form-group input.has-value,
         .form-group select.has-value,
@@ -82,7 +85,9 @@
             color:#ffffff;
             box-shadow:0 0 6px rgba(167,139,250,.2);
         }
-        .form-group input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.7); }
+        .form-group select { -webkit-appearance:none; -moz-appearance:none; appearance:none; padding-right:30px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237c8aaa' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; }
+        .form-group input[type="date"] { min-height:42px; cursor:pointer; }
+        .form-group input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.7); cursor:pointer; }
         .form-group textarea { resize:vertical; min-height:60px; }
 
         /* 出卡紀錄區 */
@@ -250,9 +255,11 @@
         @media(max-width:600px){
             .form-row { flex-direction:column; }
             .form-group { min-width:100%; }
-            /* 出卡紀錄：卡名+角色 並排 */
-            .pull-entry .form-row:first-of-type { flex-direction:row; }
-            .pull-entry .form-row:first-of-type .form-group { min-width:0; }
+            /* 手機統一輸入框樣式 */
+            .form-group select, .form-group input[type="date"] {
+                -webkit-appearance:none; -moz-appearance:none; appearance:none;
+            }
+            /* 出卡紀錄：卡名+角色 手機各佔一行 */
             /* 抽數+鑽石 pull-cell 並排 */
             .form-row:has(.pull-cell) { flex-direction:row; }
             .pull-cell { min-width:0; flex:1; padding:10px 6px; }
@@ -348,33 +355,13 @@
             <!-- 抽卡狀態：三選一互斥 -->
             <div class="form-row">
                 <div class="check-row">
-                    <span class="check-item active" onclick="setPullMode('hasStar')" id="modeHasStar">有抽有五星</span>
-                    <span class="check-item" onclick="setPullMode('noStar')" id="modeNoStar" style="border-color:rgba(251,191,36,.2)">有抽沒五星</span>
+                    <span class="check-item active" onclick="setPullMode('hasStar')" id="modeHasStar">有抽</span>
                     <span class="check-item" onclick="setPullMode('skip')" id="modeSkip" style="border-color:rgba(252,165,165,.2)">忘記抽 / 沒抽</span>
                 </div>
             </div>
             <div id="skipNotice" class="skip-notice" style="display:none">
                 已標記為「忘記抽」，下方出卡紀錄和禮包欄位將被忽略。
             </div>
-            <div id="noStarNotice" style="display:none;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:8px;padding:12px 16px;color:var(--yellow);font-size:.85em;margin-bottom:16px">
-                有抽但沒出五星卡，只需填寫總抽數和花費鑽石。
-            </div>
-            <!-- 有抽但沒出五星：只填抽數和鑽石 -->
-            <div id="noStarSection" style="display:none">
-                <div class="form-row" style="gap:10px">
-                    <div class="pull-cell">
-                        <span class="pull-cell-tag">總抽數</span>
-                        <div class="qty-row pull-qty-row"><button type="button" class="qty-btn minus" onclick="pullQtyChange(this,'nsAt',-10)">−</button><input type="text" class="nsAt" id="nsAt" value="0" readonly><button type="button" class="qty-btn plus" onclick="pullQtyChange(this,'nsAt',10)">+</button></div>
-                        <span class="pull-cell-unit">每次 ±10</span>
-                    </div>
-                    <div class="pull-cell">
-                        <span class="pull-cell-tag">花費鑽石</span>
-                        <div class="qty-row pull-qty-row"><button type="button" class="qty-btn minus" onclick="pullQtyChange(this,'nsDia',-150)">−</button><input type="text" class="nsDia" id="nsDia" value="0" readonly><button type="button" class="qty-btn plus" onclick="pullQtyChange(this,'nsDia',150)">+</button></div>
-                        <span class="pull-cell-unit">每次 ±150</span>
-                    </div>
-                </div>
-            </div>
-
             <!-- 出卡紀錄 -->
             <div id="pullsSection">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px">
@@ -509,6 +496,38 @@ window.addEventListener('scroll',function(){
 });
 
 // ============================
+// 日期框：點擊整個框開日曆，禁止手動輸入
+// ============================
+document.addEventListener('click', function(e){
+    if(e.target.matches('input[type="date"]')){
+        // 如果還沒有值，先帶入今天
+        if(!e.target.value){
+            e.target.value = new Date().toISOString().split('T')[0];
+            checkHasValue(e.target);
+        }
+        e.target.showPicker();
+    }
+});
+document.addEventListener('keydown', function(e){
+    if(e.target.matches('input[type="date"]')){
+        e.preventDefault();
+    }
+});
+// 日期防呆：起始 > 結束時自動修正另一個
+document.addEventListener('change', function(e){
+    var from = document.getElementById('fDateFrom');
+    var to = document.getElementById('fDateTo');
+    if(e.target === from && to.value && from.value > to.value){
+        to.value = from.value;
+        checkHasValue(to);
+    }
+    if(e.target === to && from.value && to.value < from.value){
+        from.value = to.value;
+        checkHasValue(from);
+    }
+});
+
+// ============================
 // 已填欄位高亮
 // ============================
 function checkHasValue(el){
@@ -638,9 +657,9 @@ function addPull(){
                 <label>卡名</label>
                 <input type="text" class="pName" placeholder="例：祁煜·霧海神臨 或 常駐烏鴉">
             </div>
-            <div class="form-group" style="flex:0 0 100px">
+            <div class="form-group">
                 <label>角色</label>
-                <select class="pIcon">
+                <select class="pIcon" onchange="syncExtra(this)">
                     <option value="" disabled selected hidden>— 選擇 —</option>
                     <option value="⭐️">⭐️ 沈星回</option>
                     <option value="🍐">🍐 黎深</option>
@@ -649,6 +668,7 @@ function addPull(){
                     <option value="🍎">🍎 夏以晝</option>
                     <option value="📸">📸 拍照動作(加抽)</option>
                     <option value="👔">👔 拿衣服(加抽)</option>
+                    <option value="🎲">🎲 未出五星(加抽)</option>
                 </select>
             </div>
         </div>
@@ -713,14 +733,55 @@ var currentPullMode = 'hasStar';
 function setPullMode(mode){
     currentPullMode = mode;
     document.getElementById('modeHasStar').className = 'check-item' + (mode==='hasStar' ? ' active' : '');
-    document.getElementById('modeNoStar').className = 'check-item' + (mode==='noStar' ? ' active' : '');
     document.getElementById('modeSkip').className = 'check-item' + (mode==='skip' ? ' active-red' : '');
 
     document.getElementById('skipNotice').style.display = mode==='skip' ? 'block' : 'none';
-    document.getElementById('noStarNotice').style.display = mode==='noStar' ? 'block' : 'none';
-    document.getElementById('noStarSection').style.display = mode==='noStar' ? 'block' : 'none';
     document.getElementById('pullsSection').style.display = mode==='hasStar' ? 'block' : 'none';
     document.getElementById('giftSection').style.display = mode==='skip' ? 'none' : 'block';
+}
+
+// ============================
+// 角色選單連動加抽按鈕
+// ============================
+var extraIcons = ['📸','👔','🎲'];
+
+function syncExtra(select){
+    const entry = select.closest('.pull-entry');
+    const isExtra = extraIcons.includes(select.value);
+    const hasValue = !!select.value;
+
+    // 加抽 checkbox
+    const cbExtra = entry.querySelector('.pExtra');
+    const lblExtra = cbExtra.parentElement;
+    // 常駐、雙蛋黃、開盒子
+    const cbStd = entry.querySelector('.pStd');
+    const cbDbl = entry.querySelector('.pDbl');
+    const cbBox = entry.querySelector('.pBox');
+    const lblStd = cbStd.parentElement;
+    const lblDbl = cbDbl.parentElement;
+    const lblBox = cbBox.parentElement;
+
+    // 卡名欄位
+    const nameInput = entry.querySelector('.pName');
+    const extraNames = {'📸':'拍照動作(加抽)','👔':'拿衣服(加抽)','🎲':'未出五星(加抽)'};
+
+    if(isExtra){
+        // 加抽類：自動帶入卡名並鎖定，顯示加抽，隱藏常駐/雙蛋黃/開盒子
+        nameInput.value = extraNames[select.value]; nameInput.readOnly = true;
+        cbExtra.checked = true; lblExtra.classList.add('active'); lblExtra.style.display = '';
+        cbStd.checked = false; lblStd.classList.remove('active'); lblStd.style.display = 'none';
+        cbDbl.checked = false; lblDbl.classList.remove('active'); lblDbl.style.display = 'none';
+        cbBox.checked = false; lblBox.classList.remove('active'); lblBox.style.display = 'none';
+    } else if(hasValue){
+        // 確定角色：解鎖卡名，顯示常駐/雙蛋黃/開盒子，隱藏加抽
+        if(nameInput.readOnly){ nameInput.value = ''; nameInput.readOnly = false; }
+        cbExtra.checked = false; lblExtra.classList.remove('active'); lblExtra.style.display = 'none';
+        lblStd.style.display = ''; lblDbl.style.display = ''; lblBox.style.display = '';
+    } else {
+        // 未選：解鎖卡名，全部顯示
+        nameInput.readOnly = false;
+        lblExtra.style.display = ''; lblStd.style.display = ''; lblDbl.style.display = ''; lblBox.style.display = '';
+    }
 }
 
 // ============================
@@ -825,26 +886,11 @@ function buildBannerObj(){
         };
     }
 
-    if(currentPullMode === 'noStar'){
-        const nsAt = parseInt(document.getElementById('nsAt').value) || 0;
-        const nsDia = parseInt(document.getElementById('nsDia').value) || 0;
-        if(!nsAt){ focusField('nsAt','請填寫總抽數'); return null; }
-        const giftFormula = document.getElementById('giftFormula').textContent;
-        const giftTotal = parseInt(document.getElementById('giftTotal').textContent.replace(/,/g,'')) || 0;
-        let obj = { date: dateStr, name, tag, type };
-        if(partner) obj.partner = partner;
-        obj.cards = cards;
-        obj.pulls = [{n:'未出五星', icon:'🎲', at:nsAt, dia:nsDia}];
-        obj.noStar = true;
-        obj.giftFormula = giftFormula === '-' ? '' : giftFormula;
-        obj.gift = giftTotal;
-        return obj;
-    }
-
     // 收集 pulls
     const pullEntries = document.querySelectorAll('.pull-entry');
     const pulls = [];
     let hasError = false;
+    let prevPullAt = 0;
     pullEntries.forEach(entry => {
         if(hasError) return;
         const pName = entry.querySelector('.pName').value.trim();
@@ -853,19 +899,28 @@ function buildBannerObj(){
         if(!pIcon){ focusEl(entry.querySelector('.pIcon'),'出卡紀錄有未選擇角色的欄位'); hasError = true; return; }
         const pAt = parseInt(entry.querySelector('.pAt').value) || 0;
         const pDia = parseInt(entry.querySelector('.pDia').value) || 0;
-        const pStd = entry.querySelector('.pStd').checked;
-        const pDbl = entry.querySelector('.pDbl').checked;
-        const pBox = entry.querySelector('.pBox').checked;
-        const pExtra = entry.querySelector('.pExtra').checked;
+        // 防呆：有填卡名但累計抽數是 0
+        if(!pAt){ focusEl(entry.querySelector('.pAt'),'「'+pName+'」的累計抽數不能是 0'); hasError = true; return; }
+        // 防呆：累計抽數應遞增
+        if(pAt < prevPullAt){ focusEl(entry.querySelector('.pAt'),'「'+pName+'」的累計抽數不能小於上一筆（'+prevPullAt+'）'); hasError = true; return; }
+        prevPullAt = pAt;
+
+        const pStd = entry.querySelector('.pStd').checked && entry.querySelector('.pStd').parentElement.style.display !== 'none';
+        const pDbl = entry.querySelector('.pDbl').checked && entry.querySelector('.pDbl').parentElement.style.display !== 'none';
+        const pBox = entry.querySelector('.pBox').checked && entry.querySelector('.pBox').parentElement.style.display !== 'none';
+        const pExtra = entry.querySelector('.pExtra').checked && entry.querySelector('.pExtra').parentElement.style.display !== 'none';
 
         let p = {n: pName, icon: pIcon, at: pAt, dia: pDia};
         if(pStd) p.std = true;
         if(pDbl) p.dbl = true;
         if(pBox) p.box = true;
-        if(pExtra) p.extra = true;
+        if(pExtra || pIcon==='📸' || pIcon==='👔' || pIcon==='🎲') p.extra = true;
         pulls.push(p);
     });
     if(hasError) return null;
+
+    // 防呆：有抽模式但沒有任何出卡紀錄
+    if(pulls.length === 0){ showToast('請至少填寫一筆出卡紀錄', true); return null; }
 
     const giftFormula = document.getElementById('giftFormula').textContent;
     const giftTotal = parseInt(document.getElementById('giftTotal').textContent.replace(/,/g,'')) || 0;
@@ -896,8 +951,6 @@ function objToCode(obj){
     if(obj.partner){
         lines.push(`    partner:'${obj.partner}',`);
     }
-    if(obj.noStar) lines.push(`    noStar:true,`);
-
     lines.push(`    cards:[${obj.cards.map(c=>"'"+c+"'").join(',')}],`);
 
     lines.push('    pulls:[');
@@ -995,9 +1048,7 @@ function clearForm(){
     document.getElementById('fType').value = '';
     document.getElementById('fPartner').value = '';
     document.getElementById('fCards').value = '';
-    // 重置抽卡狀態回「有抽有五星」
-    document.getElementById('nsAt').value = '0';
-    document.getElementById('nsDia').value = '0';
+    // 重置抽卡狀態
     setPullMode('hasStar');
     document.getElementById('pullsList').innerHTML = '';
     pullCount = 0;
