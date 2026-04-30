@@ -160,10 +160,6 @@
         .data-item .meta { color:var(--dim); font-size:.85em; }
 
         /* 禮包計算機 */
-        .gift-calc {
-            background:rgba(251,191,36,.04); border:1px solid rgba(251,191,36,.1);
-            border-radius:10px; padding:16px; margin-top:8px;
-        }
         .gift-grid {
             display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;
         }
@@ -900,6 +896,7 @@ function objToCode(obj){
     if(obj.partner){
         lines.push(`    partner:'${obj.partner}',`);
     }
+    if(obj.noStar) lines.push(`    noStar:true,`);
 
     lines.push(`    cards:[${obj.cards.map(c=>"'"+c+"'").join(',')}],`);
 
@@ -914,7 +911,7 @@ function objToCode(obj){
     });
     lines.push('    ],');
 
-    lines.push(`    giftFormula:'${obj.giftFormula}', gift:${obj.gift}`);
+    lines.push(`    giftFormula:'${obj.giftFormula||''}', gift:${obj.gift||0}`);
     lines.push('  },');
 
     return lines.join('\n');
