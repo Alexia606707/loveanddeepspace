@@ -207,6 +207,31 @@
         }
         .back-top.show { display:flex; }
 
+        /* ===== 分頁 Tab ===== */
+        .tab-bar {
+            display:flex; gap:0; margin-bottom:30px; border-radius:12px; overflow:hidden;
+            border:1px solid var(--border); background:var(--bg-card);
+        }
+        .tab-btn {
+            flex:1; padding:14px 20px; text-align:center; cursor:pointer;
+            font-size:1.05em; font-weight:700; letter-spacing:2px;
+            color:var(--text-dim); background:transparent; border:none;
+            transition:all .2s; font-family:inherit; position:relative;
+        }
+        .tab-btn:hover { color:var(--text); background:rgba(255,255,255,.03); }
+        .tab-btn.active { color:var(--accent); background:rgba(167,139,250,.1); }
+        .tab-btn.active::after {
+            content:''; position:absolute; bottom:0; left:20%; right:20%; height:3px;
+            background:var(--accent); border-radius:3px 3px 0 0;
+        }
+        .tab-btn.active-yellow { color:var(--yellow); background:rgba(251,191,36,.1); }
+        .tab-btn.active-yellow::after {
+            content:''; position:absolute; bottom:0; left:20%; right:20%; height:3px;
+            background:var(--yellow); border-radius:3px 3px 0 0;
+        }
+        .tab-page { display:none; }
+        .tab-page.show { display:block; }
+
         /* 開關 */
         .toggle-wrap { display:inline-flex; align-items:center; gap:8px; margin-left:14px; font-size:.78em; color:var(--text-dim); vertical-align:middle; }
         .toggle-switch {
@@ -474,6 +499,29 @@ function compute(){
 // ============================
 // 渲染
 // ============================
+// ============================
+// 分頁切換
+// ============================
+function switchTab(tab, btn){
+    // 切換 tab 按鈕樣式
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.className = 'tab-btn'; });
+    if(tab === 'purchase'){
+        btn.className = 'tab-btn active-yellow';
+    } else {
+        btn.className = 'tab-btn active';
+    }
+    // 切換頁面顯示
+    document.querySelectorAll('.tab-page').forEach(function(p){ p.classList.remove('show'); });
+    var targetPage = tab === 'purchase' ? document.getElementById('tabPurchase') : document.getElementById('tabGacha');
+    if(targetPage) targetPage.classList.add('show');
+    // 切到課金紀錄時渲染（每次都重新渲染以確保圖表正確）
+    if(tab === 'purchase'){
+        renderPurchaseTab();
+    }
+    // 捲到頂端
+    window.scrollTo({top:0, behavior:'smooth'});
+}
+
 function toggleSec(el){
     var body = el.nextElementSibling;
     var arrow = el.querySelector('.arrow');
@@ -490,6 +538,15 @@ function render(){
         <h1>戀與深空 抽卡紀錄</h1>
         <div class="sub">全 ${d.totalBanners} 期卡池完整數據分析 ── <span style="display:inline-block">${d.bannerStats[0].date.split('-')[0].split('/').slice(0,2).join('/')} ~ ${d.bannerStats[d.bannerStats.length-1].date.split('-')[0].split('/').slice(0,2).join('/')}</span></div>
     </div>`;
+
+    // --- 分頁 Tab ---
+    h += `<div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('gacha',this)">抽卡紀錄</button>
+        <button class="tab-btn" onclick="switchTab('purchase',this)">💰 課金紀錄</button>
+    </div>`;
+
+    // ========== 抽卡紀錄分頁 ==========
+    h += `<div class="tab-page show" id="tabGacha">`;
 
     // --- 總覽數據 ---
     h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📊 總覽數據<span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body">
@@ -659,6 +716,12 @@ function render(){
     }
     h += `</div></div></div>`;
 
+    // ========== 關閉抽卡紀錄分頁 ==========
+    h += `</div>`;
+
+    // ========== 課金紀錄分頁（只放容器，內容由 renderPurchaseTab 動態產生）==========
+    h += `<div class="tab-page" id="tabPurchase"><div id="purchaseTabContent"></div></div>`;
+
     app.innerHTML = h;
 
     // --- 卡池明細篩選功能 ---
@@ -816,6 +879,372 @@ function render(){
         this.classList.toggle('on', includeStdChar);
         renderCharGrid(d, includeStdChar);
     });
+
+}
+
+// ============================
+// 課金紀錄分頁：篩選 + 渲染
+// ============================
+function togglePSec(el, key){
+    var body = el.nextElementSibling;
+    var arrow = el.querySelector('.arrow');
+    if(body.style.display==='none'){
+        body.style.display=''; arrow.textContent='▼'; pSecState[key]=true;
+    } else {
+        body.style.display='none'; arrow.textContent='▶'; pSecState[key]=false;
+    }
+}
+
+var pFilterTime = 'all';  // 時間篩選：'all' / '2026' / '2026/3' / 'half' / 'dateRange'
+var pFilterCat = 'all';   // 分類篩選：'all' / '月卡' / '密約' / ...
+var pDateFrom = '', pDateTo = '';  // 自訂日期範圍
+var pChartMonthly = null, pChartPie = null;
+// 記住各區塊展開/收合狀態（true=展開）
+var pSecState = {'stats':true, 'chart':true, 'monthly':true, 'detail':false};
+
+function renderPurchaseTab(timeFilter, catFilter){
+    if(timeFilter !== undefined) pFilterTime = timeFilter;
+    if(catFilter !== undefined) pFilterCat = catFilter;
+    var container = document.getElementById('purchaseTabContent');
+    if(!container) return;
+
+    if(typeof purchases === 'undefined' || purchases.length === 0){
+        container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-dim)"><div style="font-size:2em;margin-bottom:12px">💰</div><div style="font-size:1.1em">尚無課金紀錄</div><div style="font-size:.85em;margin-top:8px">請至管理後台新增課金紀錄，或直接編輯 data.js</div></div>';
+        return;
+    }
+
+    var pCatOrder = ['月卡','密約','卡池禮包','鑽石','其他'];
+    var pCatColors = {'月卡':'#6ee7b7','密約':'#fb923c','卡池禮包':'#fbbf24','鑽石':'#a78bfa','其他':'#60a5fa'};
+
+    // 交叉篩選資料
+    var filtered = purchases.filter(function(p){
+        // 時間篩選
+        var timeOk = true;
+        if(pFilterTime === 'half'){
+            // 近半年：從今天往回推 6 個月
+            var now = new Date();
+            var halfAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+            var parts = p.date.split('/');
+            var pDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+            timeOk = pDate >= halfAgo;
+        } else if(pFilterTime === 'dateRange'){
+            // 自訂日期範圍
+            if(pDateFrom && pDateTo){
+                var parts = p.date.split('/');
+                var pDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+                var from = new Date(pDateFrom);
+                var to = new Date(pDateTo); to.setHours(23,59,59);
+                timeOk = pDate >= from && pDate <= to;
+            }
+        } else if(pFilterTime !== 'all'){
+            var parts = p.date.split('/');
+            if(/^\d{4}$/.test(pFilterTime)){
+                timeOk = parts[0] === pFilterTime;
+            } else if(/^\d{4}\/\d+$/.test(pFilterTime)){
+                timeOk = parts[0]+'/'+parts[1] === pFilterTime;
+            }
+        }
+        // 分類篩選
+        var catOk = (pFilterCat === 'all') || (p.category === pFilterCat);
+        return timeOk && catOk;
+    });
+
+    // 計算統計
+    var pTotal = 0, pCategoryMap = {}, pMonthMap = {}, pCount = filtered.length;
+    filtered.forEach(function(p){
+        pTotal += p.amount;
+        if(!pCategoryMap[p.category]) pCategoryMap[p.category] = 0;
+        pCategoryMap[p.category] += p.amount;
+        var parts = p.date.split('/');
+        var ym = parts[0] + '/' + parts[1];
+        if(!pMonthMap[ym]) pMonthMap[ym] = {total:0};
+        if(!pMonthMap[ym][p.category]) pMonthMap[ym][p.category] = 0;
+        pMonthMap[ym].total += p.amount;
+        pMonthMap[ym][p.category] += p.amount;
+    });
+    var pMonthCount = Object.keys(pMonthMap).length || 1;
+    var pAvgMonth = Math.round(pTotal / pMonthCount);
+    var pCatUsed = pCatOrder.filter(function(c){ return pCategoryMap[c] > 0; });
+    var pMonthKeys = Object.keys(pMonthMap).sort(function(a,b){
+        var pa = a.split('/'), pb = b.split('/');
+        return (parseInt(pa[0])*100+parseInt(pa[1])) - (parseInt(pb[0])*100+parseInt(pb[1]));
+    });
+    var pMaxMonth = '', pMaxMonthAmt = 0, pMinMonth = '', pMinMonthAmt = Infinity;
+    pMonthKeys.forEach(function(ym){
+        if(pMonthMap[ym].total > pMaxMonthAmt){ pMaxMonthAmt = pMonthMap[ym].total; pMaxMonth = ym; }
+        if(pMonthMap[ym].total < pMinMonthAmt){ pMinMonthAmt = pMonthMap[ym].total; pMinMonth = ym; }
+    });
+
+    // 收集所有年份和月份（從全部資料，不是篩選後的）
+    var allYears = new Set(), allMonths = new Set();
+    purchases.forEach(function(p){
+        var parts = p.date.split('/');
+        allYears.add(parts[0]);
+        allMonths.add(parts[0]+'/'+parts[1]);
+    });
+    var allCatsUsed = pCatOrder.filter(function(c){
+        return purchases.some(function(p){ return p.category === c; });
+    });
+
+    var h = '';
+
+    // === 篩選列 ===
+    h += '<div id="purchaseFilterBar" style="position:sticky;top:0;z-index:30;background:rgba(22,20,50,.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:14px;padding:12px 18px;margin-bottom:18px">';
+    // 第一列：全部 + 年份 + 近半年 + 自訂日期
+    var selStyle = 'background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.85em;min-height:32px';
+    h += '<div class="filter-bar" style="margin-bottom:8px">';
+    h += '<button class="filter-btn pf-time'+(pFilterTime==='all'?' active':'')+'" data-pt="all">全部</button>';
+    [...allYears].sort().forEach(function(y){
+        h += '<button class="filter-btn pf-time'+(pFilterTime===y?' active':'')+'" data-pt="'+y+'">'+y+'</button>';
+    });
+    h += '<button class="filter-btn pf-time'+(pFilterTime==='half'?' active':'')+'" data-pt="half">近半年</button>';
+    h += '<button class="filter-btn pf-time'+(pFilterTime==='dateRange'?' active':'')+'" data-pt="dateRange">自訂日期</button>';
+    h += '</div>';
+    // 自訂日期輸入列
+    if(pFilterTime === 'dateRange'){
+        // 預設值：最早到最晚
+        if(!pDateFrom || !pDateTo){
+            var allDates = purchases.map(function(p){ var ps=p.date.split('/'); return ps[0]+'-'+(ps[1].length<2?'0':'')+ps[1]+'-'+(ps[2].length<2?'0':'')+ps[2]; }).sort();
+            if(!pDateFrom) pDateFrom = allDates[0];
+            if(!pDateTo) pDateTo = allDates[allDates.length-1];
+        }
+        h += '<div class="filter-bar" style="margin-bottom:8px;align-items:center">';
+        h += '<input type="date" id="pDateFrom" value="'+pDateFrom+'" style="'+selStyle+'">';
+        h += '<span style="color:var(--text-dim);font-size:.85em"> ~ </span>';
+        h += '<input type="date" id="pDateTo" value="'+pDateTo+'" style="'+selStyle+'">';
+        h += '</div>';
+    }
+    // 第二列：月份（選了年份時展開）
+    if(/^\d{4}$/.test(pFilterTime) || /^\d{4}\/\d+$/.test(pFilterTime)){
+        var filterYear = pFilterTime.split('/')[0];
+        var yearMonths = [...allMonths].filter(function(m){ return m.startsWith(filterYear+'/'); }).sort(function(a,b){
+            return parseInt(a.split('/')[1]) - parseInt(b.split('/')[1]);
+        });
+        if(yearMonths.length > 1){
+            h += '<div class="filter-bar" style="margin-bottom:8px">';
+            h += '<button class="filter-btn pf-time'+(pFilterTime===filterYear?' active':'')+'" data-pt="'+filterYear+'">'+filterYear+' 全年</button>';
+            yearMonths.forEach(function(ym){
+                h += '<button class="filter-btn pf-time'+(pFilterTime===ym?' active':'')+'" data-pt="'+ym+'">'+ym.split('/')[1]+'月</button>';
+            });
+            h += '</div>';
+        }
+    }
+    // 第三列：分類
+    h += '<div class="filter-bar" style="margin-bottom:0">';
+    h += '<button class="filter-btn pf-cat'+(pFilterCat==='all'?' active':'')+'" data-pc="all">全部分類</button>';
+    allCatsUsed.forEach(function(cat){
+        var color = pCatColors[cat];
+        var isActive = pFilterCat === cat;
+        h += '<button class="filter-btn pf-cat" data-pc="'+cat+'" style="'+(isActive?'background:'+color+'33;border-color:'+color+';color:'+color:'')+'">'+cat+'</button>';
+    });
+    h += '</div>';
+    h += '</div>';
+
+    // === 篩選提示 ===
+    var hasFilter = pFilterTime !== 'all' || pFilterCat !== 'all';
+    if(hasFilter){
+        var filterDesc = [];
+        if(pFilterTime === 'half') filterDesc.push('近半年');
+        else if(pFilterTime === 'dateRange') filterDesc.push(pDateFrom+' ~ '+pDateTo);
+        else if(pFilterTime !== 'all') filterDesc.push(pFilterTime);
+        if(pFilterCat !== 'all') filterDesc.push(pFilterCat);
+        h += '<div style="font-size:.85em;color:var(--yellow);margin-bottom:14px;padding:8px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.12);border-radius:8px;display:flex;align-items:center;justify-content:space-between">';
+        h += '<span>篩選：<b>'+filterDesc.join(' × ')+'</b>（'+pCount+' 筆，共 '+pTotal.toLocaleString()+' 元）</span>';
+        h += '<button class="filter-btn pf-clear" style="font-size:.8em;padding:3px 12px">清除篩選</button>';
+        h += '</div>';
+    }
+
+    // === 📊 總覽數據 ===
+    h += '<div class="section"><div class="section-title" onclick="togglePSec(this,\'stats\')" style="border-left-color:var(--yellow)">📊 總覽數據<span class="arrow" style="font-size:.7em">'+(pSecState.stats?'▼':'▶')+'</span></div><div class="sec-body"'+(pSecState.stats?'':' style="display:none"')+'>';
+    h += '<div class="stats-grid">';
+    h += '<div class="stat-box"><div class="label">總花費</div><div class="val" style="color:var(--yellow)">'+pTotal.toLocaleString()+'</div><div class="note">共 '+pCount+' 筆紀錄</div></div>';
+    h += '<div class="stat-box"><div class="label">月均花費</div><div class="val" style="color:var(--yellow)">'+pAvgMonth.toLocaleString()+'</div><div class="note">共 '+pMonthCount+' 個月</div></div>';
+    if(pMonthKeys.length > 1){
+        h += '<div class="stat-box"><div class="label">最高月份</div><div class="val" style="color:var(--red)">'+pMaxMonthAmt.toLocaleString()+'</div><div class="note">'+pMaxMonth+'</div></div>';
+        h += '<div class="stat-box"><div class="label">最低月份</div><div class="val" style="color:var(--green)">'+pMinMonthAmt.toLocaleString()+'</div><div class="note">'+pMinMonth+'</div></div>';
+    }
+    pCatUsed.forEach(function(cat){
+        var color = pCatColors[cat] || 'var(--dim)';
+        var pct = pTotal > 0 ? Math.round(pCategoryMap[cat] / pTotal * 100) : 0;
+        h += '<div class="stat-box"><div class="label">'+cat+'</div><div class="val" style="color:'+color+'">'+pCategoryMap[cat].toLocaleString()+'</div><div class="note">佔 '+pct+'%</div></div>';
+    });
+    h += '</div>';
+    h += '</div></div>';
+
+    // === 📈 花費趨勢 ===
+    if(pMonthKeys.length > 0){
+        h += '<div class="section"><div class="section-title" onclick="togglePSec(this,\'chart\')" style="border-left-color:var(--yellow)">📈 花費趨勢<span class="arrow" style="font-size:.7em">'+(pSecState.chart?'▼':'▶')+'</span></div><div class="sec-body"'+(pSecState.chart?'':' style="display:none"')+'>';
+        h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">';
+        h += '<div class="chart-wrap"><div style="height:350px"><canvas id="chartPurchaseMonthly"></canvas></div></div>';
+        if(pCatUsed.length > 1){
+            h += '<div class="chart-wrap"><div style="height:350px"><canvas id="chartPurchasePie"></canvas></div></div>';
+        }
+        h += '</div>';
+        h += '</div></div>';
+    }
+
+    // === 📋 每月明細 ===
+    if(pMonthKeys.length > 0 && pCatUsed.length > 0){
+        h += '<div class="section"><div class="section-title" onclick="togglePSec(this,\'monthly\')" style="border-left-color:var(--yellow)">📋 每月明細<span class="arrow" style="font-size:.7em">'+(pSecState.monthly?'▼':'▶')+'</span></div><div class="sec-body"'+(pSecState.monthly?'':' style="display:none"')+'>';
+        h += '<table class="rank-tbl"><thead><tr><th>月份</th>';
+        pCatUsed.forEach(function(cat){ h += '<th style="color:'+pCatColors[cat]+'">'+cat+'</th>'; });
+        h += '<th>合計</th></tr></thead><tbody>';
+        pMonthKeys.forEach(function(ym){
+            h += '<tr><td>'+ym+'</td>';
+            pCatUsed.forEach(function(cat){
+                var val = pMonthMap[ym][cat] || 0;
+                h += '<td>'+(val > 0 ? val.toLocaleString() : '<span class="c-dim">-</span>')+'</td>';
+            });
+            h += '<td class="c-yellow" style="font-weight:700">'+pMonthMap[ym].total.toLocaleString()+'</td></tr>';
+        });
+        if(pMonthKeys.length > 1){
+            h += '<tr style="border-top:2px solid var(--border);font-weight:700"><td style="color:var(--yellow)">合計</td>';
+            pCatUsed.forEach(function(cat){
+                h += '<td style="color:'+pCatColors[cat]+'">'+pCategoryMap[cat].toLocaleString()+'</td>';
+            });
+            h += '<td class="c-yellow">'+pTotal.toLocaleString()+'</td></tr>';
+        }
+        h += '</tbody></table>';
+        h += '</div></div>';
+    }
+
+    // === 📝 課金明細 ===
+    h += '<div class="section"><div class="section-title" onclick="togglePSec(this,\'detail\')" style="border-left-color:var(--yellow)">📝 課金明細（由新到舊）<span class="arrow" style="font-size:.7em">'+(pSecState.detail?'▼':'▶')+'</span></div><div class="sec-body"'+(pSecState.detail?'':' style="display:none"')+'>';
+    h += '<table class="rank-tbl"><thead><tr><th style="width:18%">日期</th><th style="width:16%">分類</th><th style="width:30%;text-align:left">名稱</th><th style="width:16%">金額</th><th style="width:20%;text-align:left">備註</th></tr></thead><tbody>';
+    for(var pi = filtered.length - 1; pi >= 0; pi--){
+        var p = filtered[pi];
+        var catColor = pCatColors[p.category] || 'var(--dim)';
+        h += '<tr><td class="c-dim">'+p.date+'</td>';
+        h += '<td><span style="color:'+catColor+'">'+p.category+'</span></td>';
+        h += '<td style="text-align:left">'+p.name+'</td>';
+        h += '<td class="c-yellow" style="font-weight:700">'+p.amount.toLocaleString()+'</td>';
+        h += '<td class="c-dim" style="text-align:left">'+(p.note||'')+'</td></tr>';
+    }
+    if(filtered.length === 0){
+        h += '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px">此篩選條件下無資料</td></tr>';
+    }
+    h += '</tbody></table>';
+    h += '</div></div>';
+
+    container.innerHTML = h;
+
+    // === 綁定篩選按鈕事件 ===
+    container.querySelectorAll('.pf-time').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            renderPurchaseTab(btn.dataset.pt, undefined);
+        });
+    });
+    container.querySelectorAll('.pf-cat').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            renderPurchaseTab(undefined, btn.dataset.pc);
+        });
+    });
+    container.querySelectorAll('.pf-clear').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            pDateFrom = ''; pDateTo = '';
+            renderPurchaseTab('all', 'all');
+        });
+    });
+    // 自訂日期 change 事件
+    var dateFromEl = document.getElementById('pDateFrom');
+    var dateToEl = document.getElementById('pDateTo');
+    if(dateFromEl){
+        dateFromEl.addEventListener('change', function(){
+            pDateFrom = this.value;
+            if(pDateTo && pDateFrom > pDateTo){ pDateTo = pDateFrom; }
+            renderPurchaseTab('dateRange', undefined);
+        });
+    }
+    if(dateToEl){
+        dateToEl.addEventListener('change', function(){
+            pDateTo = this.value;
+            if(pDateFrom && pDateTo < pDateFrom){ pDateFrom = pDateTo; }
+            renderPurchaseTab('dateRange', undefined);
+        });
+    }
+
+    // === section-title sticky 在篩選列下方 ===
+    var filterBar = document.getElementById('purchaseFilterBar');
+    if(filterBar){
+        var filterH = filterBar.offsetHeight;
+        container.querySelectorAll('.section-title').forEach(function(el){
+            el.style.top = filterH + 'px';
+            el.style.zIndex = '20';
+        });
+    }
+
+    // === 繪製圖表 ===
+    if(pChartMonthly){ pChartMonthly.destroy(); pChartMonthly = null; }
+    if(pChartPie){ pChartPie.destroy(); pChartPie = null; }
+
+    var canvasMonthly = document.getElementById('chartPurchaseMonthly');
+    if(canvasMonthly && pMonthKeys.length > 0){
+        var monthlyDatasets = pCatUsed.map(function(cat){
+            return {
+                label: cat,
+                data: pMonthKeys.map(function(ym){ return pMonthMap[ym][cat] || 0; }),
+                backgroundColor: pCatColors[cat] + '99',
+                borderColor: pCatColors[cat],
+                borderWidth: 1,
+                borderRadius: 4
+            };
+        });
+        var cumTotal = 0;
+        var cumData = pMonthKeys.map(function(ym){ cumTotal += pMonthMap[ym].total; return cumTotal; });
+        monthlyDatasets.push({
+            label: '累計花費',
+            data: cumData,
+            type: 'line',
+            borderColor: '#fb923c',
+            backgroundColor: 'transparent',
+            pointRadius: 3,
+            pointBackgroundColor: '#fb923c',
+            tension: 0.3,
+            yAxisID: 'y1'
+        });
+        pChartMonthly = new Chart(canvasMonthly, {
+            type: 'bar',
+            data: { labels: pMonthKeys, datasets: monthlyDatasets },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: { display:true, text:'每月課金花費趨勢（含累計）', color:'#fde68a', font:{size:14} },
+                    legend: { labels:{color:'#8b8fa3'} }
+                },
+                scales: {
+                    x: { stacked:true, ticks:{color:'#666'} },
+                    y: { stacked:true, title:{display:true,text:'月花費',color:'#fbbf24'}, ticks:{color:'#fbbf24'}, grid:{color:'rgba(255,255,255,.04)'} },
+                    y1: { position:'right', title:{display:true,text:'累計',color:'#fb923c'}, ticks:{color:'#fb923c'}, grid:{drawOnChartArea:false} }
+                }
+            }
+        });
+    }
+
+    var canvasPie = document.getElementById('chartPurchasePie');
+    if(canvasPie && pCatUsed.length > 1){
+        var pieData = pCatUsed.map(function(cat){ return pCategoryMap[cat]; });
+        var pieColors = pCatUsed.map(function(cat){ return pCatColors[cat]; });
+        pChartPie = new Chart(canvasPie, {
+            type: 'doughnut',
+            data: {
+                labels: pCatUsed.map(function(cat,i){ return cat + ' (' + pieData[i].toLocaleString() + ')'; }),
+                datasets: [{
+                    data: pieData,
+                    backgroundColor: pieColors.map(function(c){ return c + '99'; }),
+                    borderColor: pieColors,
+                    borderWidth: 2,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: { display:true, text:'課金分類佔比', color:'#fde68a', font:{size:14} },
+                    legend: { position:'bottom', labels:{color:'#8b8fa3',padding:12,font:{size:11}} }
+                }
+            }
+        });
+    }
 }
 
 function renderCharGrid(d, includeStd){

@@ -91,16 +91,16 @@
         .form-group textarea { resize:vertical; min-height:60px; }
 
         /* 出卡紀錄區 */
-        .pull-entry {
+        .pull-entry, .purchase-entry {
             background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.05);
             border-radius:10px; padding:14px; margin-bottom:10px; position:relative;
         }
-        .pull-entry .pull-num {
+        .pull-entry .pull-num, .purchase-entry .pull-num {
             position:absolute; top:8px; left:12px; font-size:.9em; color:var(--accent);
             background:rgba(167,139,250,.15); padding:4px 12px; border-radius:6px; font-weight:600;
         }
-        .pull-entry .form-row { margin-top:12px; }
-        .pull-entry .form-row:first-of-type { margin-top:36px; }
+        .pull-entry .form-row, .purchase-entry .form-row { margin-top:12px; }
+        .pull-entry .form-row:first-of-type, .purchase-entry .form-row:first-of-type { margin-top:36px; }
 
         .check-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
         .check-item {
@@ -272,6 +272,31 @@
         }
         .back-top.show { display:flex; }
 
+        /* 分頁 Tab */
+        .tab-bar {
+            display:flex; gap:0; margin-bottom:24px; border-radius:12px; overflow:hidden;
+            border:1px solid var(--border); background:var(--card);
+        }
+        .tab-btn {
+            flex:1; padding:14px 20px; text-align:center; cursor:pointer;
+            font-size:1.05em; font-weight:700; letter-spacing:2px;
+            color:var(--dim); background:transparent; border:none;
+            transition:all .2s; font-family:inherit; position:relative;
+        }
+        .tab-btn:hover { color:var(--text); background:rgba(255,255,255,.03); }
+        .tab-btn.active { color:var(--accent); background:rgba(167,139,250,.1); }
+        .tab-btn.active::after {
+            content:''; position:absolute; bottom:0; left:20%; right:20%; height:3px;
+            background:var(--accent); border-radius:3px 3px 0 0;
+        }
+        .tab-btn.active-yellow { color:var(--yellow); background:rgba(251,191,36,.1); }
+        .tab-btn.active-yellow::after {
+            content:''; position:absolute; bottom:0; left:20%; right:20%; height:3px;
+            background:var(--yellow); border-radius:3px 3px 0 0;
+        }
+        .tab-page { display:none; }
+        .tab-page.show { display:block; }
+
         @media(max-width:600px){
             .form-row { flex-direction:column; }
             .form-group { min-width:100%; }
@@ -311,8 +336,17 @@
     <div id="mainPanel">
         <div class="panel-title">
             <h1>抽卡紀錄 管理後台</h1>
-            <div class="sub">新增 / 管理卡池資料</div>
+            <div class="sub">新增 / 管理資料</div>
         </div>
+
+        <!-- 分頁 Tab -->
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchAdminTab('banner',this)">卡池管理</button>
+            <button class="tab-btn" onclick="switchAdminTab('purchase',this)">💰 課金紀錄</button>
+        </div>
+
+        <!-- ========== 卡池管理分頁 ========== -->
+        <div class="tab-page show" id="tabBanner">
 
         <!-- 現有資料總覽 -->
         <div class="form-section">
@@ -470,6 +504,48 @@
             </p>
         </div>
 
+        </div><!-- 關閉 tabBanner -->
+
+        <!-- ========== 課金紀錄分頁 ========== -->
+        <div class="tab-page" id="tabPurchase">
+
+            <!-- 現有課金紀錄列表 -->
+            <div class="form-section">
+                <h2 style="color:var(--yellow)">現有課金紀錄（共 <span id="purchaseCount">0</span> 筆）</h2>
+                <div id="purchaseList" class="data-list"></div>
+            </div>
+
+            <!-- 新增課金表單 -->
+            <div class="form-section">
+                <h2 style="color:var(--yellow)">新增課金紀錄</h2>
+
+                <div id="purchaseEntries"></div>
+                <div style="text-align:center;margin-top:10px">
+                    <button class="btn btn-accent" onclick="addPurchaseEntry()">+ 新增一筆</button>
+                </div>
+
+                <!-- 操作按鈕 -->
+                <div class="btn-row" style="margin-top:20px;justify-content:center">
+                    <button class="btn btn-green" onclick="generatePurchaseCode()" style="font-size:1em;padding:10px 30px">產生程式碼</button>
+                    <button class="btn btn-accent" onclick="savePurchaseToData()" style="font-size:1em;padding:10px 30px">儲存到 data.js</button>
+                    <button class="btn btn-danger" onclick="clearPurchaseForm()">清空表單</button>
+                </div>
+            </div>
+
+            <!-- 課金程式碼預覽 -->
+            <div class="form-section" id="purchasePreviewSection" style="display:none">
+                <h2 style="color:var(--yellow)">產生的程式碼</h2>
+                <div class="preview-box" id="purchasePreviewBox" style="position:relative">
+                    <button class="copy-btn" onclick="copyPurchaseCode()" style="border-color:var(--yellow);color:var(--yellow)">複製</button>
+                    <pre id="purchaseCodeOutput" style="color:#fde68a"></pre>
+                </div>
+                <p style="color:var(--dim);font-size:.78em;margin-top:10px">
+                    可以直接複製這段程式碼，貼到 data.js 的 purchases 陣列最後面（ ]; 之前）。
+                    <br>或點「儲存到 data.js」自動附加。
+                </p>
+            </div>
+        </div><!-- 關閉 tabPurchase -->
+
     </div>
 </div>
 
@@ -477,6 +553,22 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ============================
+// 分頁切換
+// ============================
+function switchAdminTab(tab, btn){
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.className = 'tab-btn'; });
+    if(tab === 'purchase'){
+        btn.className = 'tab-btn active-yellow';
+    } else {
+        btn.className = 'tab-btn active';
+    }
+    document.querySelectorAll('.tab-page').forEach(function(p){ p.classList.remove('show'); });
+    var target = tab === 'purchase' ? document.getElementById('tabPurchase') : document.getElementById('tabBanner');
+    if(target) target.classList.add('show');
+    window.scrollTo({top:0, behavior:'smooth'});
+}
+
 // ============================
 // 密碼驗證
 // ============================
@@ -651,7 +743,7 @@ function getCardsList(){
 // 更新所有出卡紀錄的卡名下拉選項
 function updatePullCardOptions(){
     const cards = getCardsList();
-    document.querySelectorAll('.pull-entry').forEach(entry => {
+    document.querySelectorAll('#pullsList .pull-entry').forEach(entry => {
         const select = entry.querySelector('.pIcon');
         const nameSelect = entry.querySelector('.pName');
         // 只更新非加抽、非鎖定的
@@ -687,11 +779,12 @@ addCard();
 function loadDataList(){
     if(typeof banners !== 'undefined'){
         renderDataList();
+        renderPurchaseList();
         return;
     }
     const s = document.createElement('script');
     s.src = 'data.js?' + Date.now();
-    s.onload = renderDataList;
+    s.onload = function(){ renderDataList(); renderPurchaseList(); };
     document.head.appendChild(s);
 }
 
@@ -779,11 +872,12 @@ function addPull(){
         prevAt = parseInt(lastEntry.querySelector('.pAt').value) || 0;
     }
     pullCount++;
+    const displayNum = document.querySelectorAll('#pullsList .pull-entry').length + 1;
     const div = document.createElement('div');
     div.className = 'pull-entry';
     div.id = 'pull_' + pullCount;
     div.innerHTML = `
-        <span class="pull-num">#${pullCount}</span>
+        <span class="pull-num">#${displayNum}</span>
         <div class="form-row">
             <div class="form-group">
                 <label>角色</label>
@@ -1134,7 +1228,7 @@ function buildBannerObj(){
     }
 
     // 收集 pulls
-    const pullEntries = document.querySelectorAll('.pull-entry');
+    const pullEntries = document.querySelectorAll('#pullsList .pull-entry');
     const pulls = [];
     let hasError = false;
     let prevPullAt = 0;
@@ -1315,6 +1409,467 @@ function clearForm(){
 // ============================
 // Toast 提示
 // ============================
+// ============================
+// 課金紀錄管理
+// ============================
+
+// 載入現有課金紀錄列表
+var purchaseListShown = 5;
+
+function loadPurchaseList(){
+    if(typeof purchases !== 'undefined'){
+        renderPurchaseList();
+    }
+}
+
+function renderPurchaseList(){
+    if(typeof purchases === 'undefined') return;
+    var el = document.getElementById('purchaseList');
+    document.getElementById('purchaseCount').textContent = purchases.length;
+    if(purchases.length === 0){
+        el.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px;font-size:.9em">尚無課金紀錄</div>';
+        return;
+    }
+    var categoryColors = {'月卡':'#6ee7b7','密約':'#fb923c','卡池禮包':'#fbbf24','鑽石':'#a78bfa','其他':'#60a5fa'};
+    var h = '';
+    var count = 0;
+    for(var i = purchases.length - 1; i >= 0; i--){
+        count++;
+        var hidden = count > purchaseListShown ? ' style="display:none"' : '';
+        var p = purchases[i];
+        var catColor = categoryColors[p.category] || 'var(--dim)';
+        h += '<div class="data-item" data-pidx="'+count+'"'+hidden+'>'
+            +'<div>'
+            +'<span style="color:'+catColor+';font-size:.75em;padding:2px 8px;border-radius:4px;border:1px solid '+catColor+';margin-right:8px">'+p.category+'</span>'
+            +'<span class="name">'+p.name+'</span>'
+            +(p.note ? '<span class="meta" style="margin-left:8px">'+p.note+'</span>' : '')
+            +'</div>'
+            +'<div class="meta">'
+            +p.date+' | <span style="color:var(--yellow);font-weight:600">'+p.amount.toLocaleString()+' 元</span>'
+            +'</div>'
+            +'</div>';
+    }
+    if(purchases.length > 5){
+        h += '<div id="purchaseShowMoreWrap" style="text-align:center;margin-top:12px;display:flex;gap:10px;justify-content:center">';
+        if(purchases.length > purchaseListShown){
+            h += '<button class="btn" style="border-color:var(--yellow);color:var(--yellow)" onclick="showMorePurchases()">顯示更多（還有 '+(purchases.length - purchaseListShown)+' 筆）</button>';
+        }
+        if(purchaseListShown > 5){
+            h += '<button class="btn" onclick="collapsePurchases()">收合</button>';
+        }
+        h += '</div>';
+    }
+    el.innerHTML = h;
+}
+
+function showMorePurchases(){
+    purchaseListShown = Math.min(purchaseListShown + 5, purchases.length);
+    var items = document.querySelectorAll('#purchaseList .data-item');
+    items.forEach(function(item){
+        var idx = parseInt(item.dataset.pidx);
+        item.style.display = idx <= purchaseListShown ? '' : 'none';
+    });
+    updatePurchaseButtons();
+}
+
+function collapsePurchases(){
+    purchaseListShown = 5;
+    var items = document.querySelectorAll('#purchaseList .data-item');
+    items.forEach(function(item){
+        var idx = parseInt(item.dataset.pidx);
+        item.style.display = idx <= 5 ? '' : 'none';
+    });
+    updatePurchaseButtons();
+}
+
+function updatePurchaseButtons(){
+    var wrap = document.getElementById('purchaseShowMoreWrap');
+    if(!wrap) return;
+    var left = purchases.length - purchaseListShown;
+    var h = '';
+    if(left > 0){
+        h += '<button class="btn" style="border-color:var(--yellow);color:var(--yellow)" onclick="showMorePurchases()">顯示更多（還有 '+left+' 筆）</button>';
+    }
+    if(purchaseListShown > 5){
+        h += '<button class="btn" onclick="collapsePurchases()">收合</button>';
+    }
+    wrap.innerHTML = h;
+}
+
+// 分類變更時自動帶入常用名稱
+// 常用金額按鈕（依分類不同顯示不同選項）
+var pAmtPresets = {
+    '月卡': [150],
+    '密約': [190, 320, 490],
+    '卡池禮包': [15, 30, 150, 290, 320, 390, 590, 820, 1690],
+    '鑽石': [30, 150, 220, 490, 890, 1490, 2990],
+    '其他': [15, 30, 45, 90, 120, 150, 220, 320, 648, 1680]
+};
+
+function updateAmtPresets(entry){
+    if(!entry) return;
+    var catSel = entry.querySelector('.pe-category');
+    var wrap = entry.querySelector('.pe-amt-presets');
+    if(!catSel || !wrap) return;
+    var cat = catSel.value;
+    var presets = pAmtPresets[cat] || [30, 150, 320, 490];
+    var h = '';
+    presets.forEach(function(amt){
+        h += '<span class="check-item" onclick="setPAmt(this,'+amt+')" style="padding:5px 12px;font-size:.82em;cursor:pointer">$'+amt+'</span>';
+    });
+    wrap.innerHTML = h;
+    highlightAmtPreset(entry);
+}
+
+function setPAmt(el, amt){
+    var entry = el.closest('.purchase-entry');
+    var input = entry.querySelector('.pe-amount');
+    input.value = amt;
+    input.classList.toggle('has-value', amt > 0);
+    highlightAmtPreset(entry);
+}
+
+function highlightAmtPreset(entry){
+    if(!entry) return;
+    var input = entry.querySelector('.pe-amount');
+    var wrap = entry.querySelector('.pe-amt-presets');
+    if(!input || !wrap) return;
+    var val = parseInt(input.value) || 0;
+    wrap.querySelectorAll('.check-item').forEach(function(btn){
+        var amt = parseInt(btn.textContent.replace('$',''));
+        btn.classList.toggle('active', amt === val);
+    });
+}
+
+function pAmtChange(btn, delta){
+    var row = btn.closest('.pull-qty-row');
+    var input = row.querySelector('.pe-amount');
+    var val = (parseInt(input.value) || 0) + delta;
+    if(val < 0) val = 0;
+    input.value = val;
+    input.classList.toggle('has-value', val > 0);
+    highlightAmtPreset(btn.closest('.purchase-entry'));
+}
+function sanitizePAmt(input){
+    input.value = input.value.replace(/[^0-9]/g, '');
+    var val = parseInt(input.value) || 0;
+    if(val < 0) val = 0;
+    input.value = val;
+    input.classList.toggle('has-value', val > 0);
+    highlightAmtPreset(input.closest('.purchase-entry'));
+}
+
+// ============================
+// 課金項目：動態新增/刪除
+// ============================
+var peCount = 0;
+
+function addPurchaseEntry(){
+    // 繼承上一筆的日期
+    var prevDate = '';
+    var lastEntry = document.querySelector('#purchaseEntries .purchase-entry:last-child');
+    if(lastEntry){
+        var prevDateEl = lastEntry.querySelector('.pe-date');
+        if(prevDateEl) prevDate = prevDateEl.value;
+    }
+    peCount++;
+    var displayNum = document.querySelectorAll('#purchaseEntries .purchase-entry').length + 1;
+    var div = document.createElement('div');
+    div.className = 'purchase-entry';
+    div.id = 'pe_' + peCount;
+    div.innerHTML = '<span class="pull-num">#'+displayNum+'</span>'
+        +'<div class="form-row" style="margin-top:36px">'
+        +'<div class="form-group">'
+        +'<label>日期</label>'
+        +'<input type="date" class="pe-date" value="'+prevDate+'">'
+        +'</div>'
+        +'<div class="form-group">'
+        +'<label>備註（選填）</label>'
+        +'<input type="text" class="pe-note" placeholder="選填備註">'
+        +'</div>'
+        +'</div>'
+        +'<div class="form-row">'
+        +'<div class="form-group">'
+        +'<label>分類</label>'
+        +'<select class="pe-category" onchange="checkHasValue(this);onPurchaseCategoryChange(this)">'
+        +'<option value="" disabled selected hidden>— 請選擇 —</option>'
+        +'<option value="月卡">月卡</option>'
+        +'<option value="密約">密約</option>'
+        +'<option value="卡池禮包">卡池禮包</option>'
+        +'<option value="鑽石">鑽石</option>'
+        +'<option value="其他">其他</option>'
+        +'</select>'
+        +'</div>'
+        +'<div class="form-group pe-name-wrap">'
+        +'<label>名稱</label>'
+        +'<input type="text" class="pe-name" placeholder="先選分類">'
+        +'</div>'
+        +'</div>'
+        +'<div class="form-row">'
+        +'<div class="form-group">'
+        +'<label>金額</label>'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        +'<div class="pull-qty-row">'
+        +'<button type="button" class="qty-btn minus" onclick="pAmtChange(this,-1)">−</button>'
+        +'<input type="number" class="pe-amount" value="" min="0" placeholder="0" oninput="sanitizePAmt(this)" style="width:80px">'
+        +'<button type="button" class="qty-btn plus" onclick="pAmtChange(this,1)">+</button>'
+        +'</div>'
+        +'<div class="check-row pe-amt-presets"></div>'
+        +'</div>'
+        +'<span style="font-size:.72em;color:var(--dim);margin-top:2px">每次 ±1 或點選常用金額</span>'
+        +'</div>'
+        +'</div>'
+        +'<div style="text-align:right;margin-top:6px">'
+        +'<button class="btn btn-danger" onclick="removePurchaseEntry('+peCount+')" style="font-size:.75em;padding:4px 12px">刪除此筆</button>'
+        +'</div>';
+    document.getElementById('purchaseEntries').appendChild(div);
+    // 如果有繼承日期，標記 has-value
+    if(prevDate){
+        var dateEl = div.querySelector('.pe-date');
+        if(dateEl) checkHasValue(dateEl);
+    }
+    updatePeDeleteBtns();
+}
+
+function removePurchaseEntry(id){
+    var entries = document.querySelectorAll('#purchaseEntries .purchase-entry');
+    if(entries.length <= 1){
+        showToast('至少要保留一筆課金項目', true);
+        return;
+    }
+    var el = document.getElementById('pe_' + id);
+    if(el) el.remove();
+    var remaining = document.querySelectorAll('#purchaseEntries .purchase-entry');
+    remaining.forEach(function(entry, i){
+        entry.querySelector('.pull-num').textContent = '#' + (i + 1);
+    });
+    updatePeDeleteBtns();
+}
+
+function updatePeDeleteBtns(){
+    var entries = document.querySelectorAll('#purchaseEntries .purchase-entry');
+    entries.forEach(function(entry){
+        var btn = entry.querySelector('.btn-danger');
+        btn.style.display = entries.length <= 1 ? 'none' : '';
+    });
+}
+
+// 預設新增一筆
+addPurchaseEntry();
+
+// 各分類的名稱選項和預設金額
+var pCatConfig = {
+    '月卡': {
+        type: 'select',
+        options: [
+            {name:'30天鎏金卡', amount:150}
+        ]
+    },
+    '密約': {
+        type: 'select',
+        options: [
+            {name:'升級版特別密約', amount:490},
+            {name:'特別密約', amount:320},
+            {name:'升級特別密約', amount:190}
+        ]
+    },
+    '卡池禮包': {
+        type: 'input',
+        defaultName: '',
+        defaultAmount: 0
+    },
+    '鑽石': {
+        type: 'select',
+        options: [
+            {name:'60晶鑽', amount:30},
+            {name:'300晶鑽', amount:150},
+            {name:'450晶鑽', amount:220},
+            {name:'980晶鑽', amount:490},
+            {name:'1980晶鑽', amount:890},
+            {name:'3280晶鑽', amount:1490},
+            {name:'6480晶鑽', amount:2990}
+        ]
+    },
+    '其他': {
+        type: 'input',
+        defaultName: '',
+        defaultAmount: 0
+    }
+};
+
+function onPurchaseCategoryChange(selectEl){
+    var entry = selectEl.closest('.purchase-entry');
+    if(!entry) return;
+    var cat = selectEl.value;
+    var wrap = entry.querySelector('.pe-name-wrap');
+    var amountInput = entry.querySelector('.pe-amount');
+    var config = pCatConfig[cat];
+    if(!config) return;
+
+    if(config.type === 'select'){
+        var opts = config.options.map(function(o, i){
+            var label = o.amount ? o.name + '（$' + o.amount + '）' : o.name;
+            return '<option value="'+o.name+'"'+(i===0?' selected':'')+'>'+label+'</option>';
+        }).join('');
+        wrap.innerHTML = '<label>名稱</label>'
+            +'<select class="pe-name" onchange="checkHasValue(this);onPurchaseNameChange(this)">'+opts+'</select>';
+        checkHasValue(wrap.querySelector('.pe-name'));
+        amountInput.value = config.options[0].amount || '';
+        checkHasValue(amountInput);
+    } else {
+        wrap.innerHTML = '<label>名稱</label>'
+            +'<input type="text" class="pe-name" placeholder="例：遇歲折春禮。一">';
+        var nameInput = wrap.querySelector('.pe-name');
+        if(config.defaultName){
+            nameInput.value = config.defaultName;
+            checkHasValue(nameInput);
+        }
+        amountInput.value = config.defaultAmount || '';
+        checkHasValue(amountInput);
+    }
+    updateAmtPresets(entry);
+}
+
+function onPurchaseNameChange(selectEl){
+    var entry = selectEl.closest('.purchase-entry');
+    if(!entry) return;
+    var catSel = entry.querySelector('.pe-category');
+    var cat = catSel.value;
+    var name = selectEl.value;
+    var amountInput = entry.querySelector('.pe-amount');
+    var config = pCatConfig[cat];
+    if(!config || config.type !== 'select') return;
+    var match = config.options.find(function(o){ return o.name === name; });
+    if(match && match.amount){
+        amountInput.value = match.amount;
+        checkHasValue(amountInput);
+    }
+    highlightAmtPreset(entry);
+}
+
+// 建立多筆課金物件
+function buildPurchaseObjs(){
+    var entries = document.querySelectorAll('#purchaseEntries .purchase-entry');
+    var objs = [];
+    var hasError = false;
+
+    entries.forEach(function(entry, i){
+        if(hasError) return;
+        var dateEl = entry.querySelector('.pe-date');
+        var noteEl = entry.querySelector('.pe-note');
+        var catSel = entry.querySelector('.pe-category');
+        var nameEl = entry.querySelector('.pe-name');
+        var amountEl = entry.querySelector('.pe-amount');
+
+        var date = dateEl ? dateEl.value : '';
+        var note = noteEl ? noteEl.value.trim() : '';
+        var category = catSel ? catSel.value : '';
+        var name = nameEl ? nameEl.value.trim() : '';
+        var amount = amountEl ? (parseInt(amountEl.value) || 0) : 0;
+
+        if(!date){ focusEl(dateEl, '第 '+(i+1)+' 筆：請填寫日期'); hasError = true; return; }
+        if(!category){ focusEl(catSel, '第 '+(i+1)+' 筆：請選擇分類'); hasError = true; return; }
+        if(!name){ focusEl(nameEl, '第 '+(i+1)+' 筆：請填寫名稱'); hasError = true; return; }
+        if(!amount){ focusEl(amountEl, '第 '+(i+1)+' 筆：請填寫金額'); hasError = true; return; }
+
+        var parts = date.split('-');
+        var dateStr = parts[0] + '/' + parseInt(parts[1]) + '/' + parseInt(parts[2]);
+
+        objs.push({ date:dateStr, category:category, name:name, amount:amount, note:note });
+    });
+
+    if(hasError) return null;
+    if(objs.length === 0){ showToast('請至少新增一筆課金項目', true); return null; }
+    return objs;
+}
+
+function purchaseObjToCode(obj){
+    if(!obj) return '';
+    var parts = ["date:'"+obj.date+"'", "category:'"+obj.category+"'", "name:'"+obj.name+"'", "amount:"+obj.amount];
+    if(obj.note) parts.push("note:'"+obj.note+"'");
+    return '  {' + parts.join(', ') + '},';
+}
+
+function generatePurchaseCode(){
+    var objs = buildPurchaseObjs();
+    if(!objs) return;
+    var code = objs.map(function(o){ return purchaseObjToCode(o); }).join('\n');
+    document.getElementById('purchaseCodeOutput').textContent = code;
+    document.getElementById('purchasePreviewSection').style.display = 'block';
+    document.getElementById('purchasePreviewSection').scrollIntoView({behavior:'smooth'});
+    showToast('課金紀錄程式碼已產生（共 '+objs.length+' 筆）');
+}
+
+async function savePurchaseToData(){
+    var objs = buildPurchaseObjs();
+    if(!objs) return;
+    var code = objs.map(function(o){ return purchaseObjToCode(o); }).join('\n');
+
+    try {
+        var resp = await fetch('data.js?' + Date.now());
+        var content = await resp.text();
+
+        var purchasesStart = content.indexOf('const purchases');
+        if(purchasesStart === -1){
+            showToast('data.js 中找不到 purchases 陣列', true);
+            return;
+        }
+        var searchFrom = content.indexOf('[', purchasesStart);
+        var bracketEnd = content.indexOf('];', searchFrom);
+        if(bracketEnd === -1){
+            showToast('data.js 格式異常，找不到 purchases 的 ];', true);
+            return;
+        }
+
+        var newContent = content.substring(0, bracketEnd) + code + '\n' + content.substring(bracketEnd);
+
+        var blob = new Blob([newContent], {type:'text/javascript;charset=utf-8'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'data.js';
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        showToast('已下載更新後的 data.js（共 '+objs.length+' 筆），請替換原檔案');
+
+    } catch(e){
+        showToast('將以下載方式提供更新的 data.js');
+        document.getElementById('purchaseCodeOutput').textContent = code;
+        document.getElementById('purchasePreviewSection').style.display = 'block';
+        document.getElementById('purchasePreviewSection').scrollIntoView({behavior:'smooth'});
+    }
+}
+
+function copyPurchaseCode(){
+    var code = document.getElementById('purchaseCodeOutput').textContent;
+    try {
+        var ta = document.createElement('textarea');
+        ta.value = code;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showToast('已複製到剪貼簿');
+    } catch(e){
+        showToast('複製失敗，請手動選取複製', true);
+    }
+}
+
+function clearPurchaseForm(){
+    document.getElementById('purchaseEntries').innerHTML = '';
+    peCount = 0;
+    addPurchaseEntry();
+    document.getElementById('purchasePreviewSection').style.display = 'none';
+    showToast('課金表單已清空');
+}
+
+// 頁面載入時也載入課金紀錄
+if(sessionStorage.getItem('admin_auth')==='1'){
+    loadPurchaseList();
+}
+
 function showToast(msg, isError){
     const t = document.getElementById('toast');
     t.textContent = msg;
