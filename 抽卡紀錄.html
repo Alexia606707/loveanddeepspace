@@ -168,15 +168,22 @@
         .badge-unlucky { background:rgba(252,165,165,.12); color:#fca5a5; }
 
         /* ===== 篩選 ===== */
-        .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+        .filter-bar { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; margin-bottom:16px; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:4px; cursor:grab; }
+        .filter-bar.dragging { cursor:grabbing; user-select:none; }
+        .filter-bar::-webkit-scrollbar { display:none; }
+        #chartRangeBar { scrollbar-width:none; cursor:grab; }
+        #chartRangeBar.dragging { cursor:grabbing; user-select:none; }
+        #chartRangeBar::-webkit-scrollbar { display:none; }
         .filter-btn {
             font-size:.8em; padding:5px 14px; border-radius:20px; cursor:pointer;
             background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--text-dim);
-            transition: all .2s;
+            transition: all .2s; white-space:nowrap; flex-shrink:0;
         }
         .filter-btn:hover, .filter-btn.active { background:rgba(167,139,250,.15); border-color:var(--accent); color:var(--accent); }
         .chart-range-btn { background:#1a1735; }
         .chart-range-btn:hover, .chart-range-btn.active { background:rgba(167,139,250,.25); }
+        /* 參考管理後台：下拉選單 option 深色背景 + 淺色文字 */
+        #chartFrom option, #chartTo option { background:#1a1040; color:#e0e0e0; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1); }
 
         /* ===== RWD ===== */
@@ -595,17 +602,17 @@ function render(){
     let selStyle = 'background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.85em;min-height:32px';
 
     h += `<div class="section"><div class="section-title" onclick="toggleSec(this)">📈 抽卡成本趨勢<span class="arrow" style="font-size:.7em">▼</span></div><div class="sec-body">
-        <div id="chartRangeBar" style="position:sticky;top:46px;z-index:10;background:rgba(22,20,50,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:14px;padding:12px 18px;margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div id="chartRangeBar" style="position:sticky;top:46px;z-index:10;background:rgba(22,20,50,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:14px;padding:12px 18px;margin-bottom:18px;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">
             <button class="filter-btn chart-range-btn active" data-range="all">全部</button>
             ${yearBtns}
             <button class="filter-btn chart-range-btn" data-range="half">近半年</button>
             <button class="filter-btn chart-range-btn" data-range="custom">自訂卡池</button>
             <button class="filter-btn chart-range-btn" data-range="dateRange">自訂日期</button>
-            <div id="customRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.8em;color:var(--text-dim);width:100%;flex-wrap:wrap;margin-top:4px">
+            <div id="customRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.8em;color:var(--text-dim);flex-shrink:0;flex-wrap:nowrap">
                 <select id="chartFrom" style="${selStyle};max-width:45vw;overflow:hidden;text-overflow:ellipsis"></select>
                 ~ <select id="chartTo" style="${selStyle};max-width:45vw;overflow:hidden;text-overflow:ellipsis"></select>
             </div>
-            <div id="dateRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.8em;color:var(--text-dim);width:100%;margin-top:4px">
+            <div id="dateRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.8em;color:var(--text-dim);flex-shrink:0">
                 <input type="date" id="dateFrom" style="${selStyle}">
                 ~ <input type="date" id="dateTo" style="${selStyle}">
             </div>
@@ -917,27 +924,31 @@ function renderPurchaseTab(timeFilter, catFilter){
     var pCatColors = {'月卡':'#6ee7b7','密約':'#fb923c','卡池禮包':'#fbbf24','鑽石':'#a78bfa','其他':'#60a5fa'};
 
     // 交叉篩選資料
+    // 取日期純日期部分（去掉時間，例如 '2024/3/7 10:48:22' → '2024/3/7'）
+    function pPureDate(d){ return d.split(' ')[0]; }
+
     var filtered = purchases.filter(function(p){
         // 時間篩選
+        var pd = pPureDate(p.date);
         var timeOk = true;
         if(pFilterTime === 'half'){
             // 近半年：從今天往回推 6 個月
             var now = new Date();
             var halfAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
-            var parts = p.date.split('/');
+            var parts = pd.split('/');
             var pDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
             timeOk = pDate >= halfAgo;
         } else if(pFilterTime === 'dateRange'){
             // 自訂日期範圍
             if(pDateFrom && pDateTo){
-                var parts = p.date.split('/');
+                var parts = pd.split('/');
                 var pDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
                 var from = new Date(pDateFrom);
                 var to = new Date(pDateTo); to.setHours(23,59,59);
                 timeOk = pDate >= from && pDate <= to;
             }
         } else if(pFilterTime !== 'all'){
-            var parts = p.date.split('/');
+            var parts = pd.split('/');
             if(/^\d{4}$/.test(pFilterTime)){
                 timeOk = parts[0] === pFilterTime;
             } else if(/^\d{4}\/\d+$/.test(pFilterTime)){
@@ -955,7 +966,7 @@ function renderPurchaseTab(timeFilter, catFilter){
         pTotal += p.amount;
         if(!pCategoryMap[p.category]) pCategoryMap[p.category] = 0;
         pCategoryMap[p.category] += p.amount;
-        var parts = p.date.split('/');
+        var parts = pPureDate(p.date).split('/');
         var ym = parts[0] + '/' + parts[1];
         if(!pMonthMap[ym]) pMonthMap[ym] = {total:0};
         if(!pMonthMap[ym][p.category]) pMonthMap[ym][p.category] = 0;
@@ -978,7 +989,7 @@ function renderPurchaseTab(timeFilter, catFilter){
     // 收集所有年份和月份（從全部資料，不是篩選後的）
     var allYears = new Set(), allMonths = new Set();
     purchases.forEach(function(p){
-        var parts = p.date.split('/');
+        var parts = pPureDate(p.date).split('/');
         allYears.add(parts[0]);
         allMonths.add(parts[0]+'/'+parts[1]);
     });
@@ -1004,7 +1015,7 @@ function renderPurchaseTab(timeFilter, catFilter){
     if(pFilterTime === 'dateRange'){
         // 預設值：最早到最晚
         if(!pDateFrom || !pDateTo){
-            var allDates = purchases.map(function(p){ var ps=p.date.split('/'); return ps[0]+'-'+(ps[1].length<2?'0':'')+ps[1]+'-'+(ps[2].length<2?'0':'')+ps[2]; }).sort();
+            var allDates = purchases.map(function(p){ var ps=pPureDate(p.date).split('/'); return ps[0]+'-'+(ps[1].length<2?'0':'')+ps[1]+'-'+(ps[2].length<2?'0':'')+ps[2]; }).sort();
             if(!pDateFrom) pDateFrom = allDates[0];
             if(!pDateTo) pDateTo = allDates[allDates.length-1];
         }
@@ -1126,7 +1137,26 @@ function renderPurchaseTab(timeFilter, catFilter){
     h += '</tbody></table>';
     h += '</div></div>';
 
+    // 記住篩選列各行的滾動位置
+    var oldFilterBar = document.getElementById('purchaseFilterBar');
+    var savedScrolls = [];
+    if(oldFilterBar){
+        oldFilterBar.querySelectorAll('.filter-bar').forEach(function(bar){
+            savedScrolls.push(bar.scrollLeft);
+        });
+    }
+
     container.innerHTML = h;
+
+    // 還原篩選列各行的滾動位置
+    var newFilterBar = document.getElementById('purchaseFilterBar');
+    if(newFilterBar){
+        var bars = newFilterBar.querySelectorAll('.filter-bar');
+        bars.forEach(function(bar, i){
+            if(savedScrolls[i] !== undefined) bar.scrollLeft = savedScrolls[i];
+            if(typeof enableDragScroll === 'function') enableDragScroll(bar);
+        });
+    }
 
     // === 綁定篩選按鈕事件 ===
     container.querySelectorAll('.pf-time').forEach(function(btn){
@@ -1500,6 +1530,27 @@ window.addEventListener('resize', function(){
 
 // 啟動
 render();
+
+// 滑鼠拖曳橫向滾動（電腦版用）
+function enableDragScroll(el){
+    var isDown = false, startX, scrollLeft;
+    el.addEventListener('mousedown', function(e){
+        if(e.button !== 0) return;
+        isDown = true; el.classList.add('dragging');
+        startX = e.pageX - el.offsetLeft;
+        scrollLeft = el.scrollLeft;
+    });
+    el.addEventListener('mouseleave', function(){ isDown = false; el.classList.remove('dragging'); });
+    el.addEventListener('mouseup', function(){ isDown = false; el.classList.remove('dragging'); });
+    el.addEventListener('mousemove', function(e){
+        if(!isDown) return;
+        e.preventDefault();
+        el.scrollLeft = scrollLeft - (e.pageX - el.offsetLeft - startX);
+    });
+}
+document.querySelectorAll('.filter-bar').forEach(enableDragScroll);
+var chartBar = document.getElementById('chartRangeBar');
+if(chartBar) enableDragScroll(chartBar);
 </script>
 </body>
 </html>
